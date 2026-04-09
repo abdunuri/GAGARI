@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id Int @id @default(autoincrement())
+  name String
+  username String @unique
+  password String
+  role Role
+  customers Customer[]
+  orders Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  STAFF
+  VIEWER
+}
+
+enum Ctype {
+  BREAD_1_ONLY
+  ALL_PRODUCT
+}
+
+model Item{
+  id Int @id @default(autoincrement())
+  name String
+  category String
+  price Float
+  orderItems OrderItem[]
+}
+
+model Order{
+  id String @id @default(cuid())
+
+  user User @relation(fields:[userId],references:[id])
+  userId Int
+
+  customer Customer @relation(fields:[customerId],references:[id])
+  customerId Int
+
+  orderItems OrderItem[]
+  status OrderStatus  @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model OrderItem{
+  id Int @id @default(autoincrement())
+  isRemoved Boolean @default(false)
+
+  item Item @relation(fields:[itemId],references:[id])
+  itemId Int
+
+  order Order @relation(fields:[orderId],references:[id])
+  orderId String
+
+  unitPrice Float
+  quantity Int
+  @@unique([itemId,orderId])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer{
+  id Int @id @default(autoincrement())
+  name String 
+  phoneNumber String
+  isActive Boolean @default(true)
+
+  user User @relation(fields:[userId],references:[id])
+  userId Int
+
+  type Ctype
+  orders Order[]
+  
+}
