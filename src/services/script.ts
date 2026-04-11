@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { $Enums } from "@prisma/client";
 
-console.log('DATABASE_URL =', process.env.DATABASE_URL)
-
 async function createUser() {
     const User = await prisma.user.create({
         data:{
