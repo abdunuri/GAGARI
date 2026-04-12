@@ -1,33 +1,9 @@
 import OrderRow from "@/components/orders/orderRow";
+import { getOrders } from "@/services/order.service";
+import Link from "next/link";
 
-type Order = {
-    id : number;
-    customerName:String;
-    total : number;
-    status:"Pending" | "Cancelled" | "Completed" ; 
-};
-
-const orders : Order[] = [
-        {
-            id: 1,
-            customerName: "Abel Trading",
-            total: 400,
-            status: "Pending",
-        },
-        {
-            id: 2,
-            customerName: "Selam Store",
-            total: 850,
-            status: "Completed",
-        },
-        {
-            id: 3,
-            customerName: "Bright Market",
-            total: 250,
-            status: "Cancelled",
-        },
-]
-export default function OrdersPage(){
+export default async function OrdersPage(){
+    const orders = await getOrders()
     return(
     <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900">
       <section className="mx-auto flex max-w-6xl flex-col gap-8">
@@ -38,7 +14,7 @@ export default function OrdersPage(){
         </div>
 
         <button className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700">
-            New Order
+           <Link href="/orders/new">New Order</Link> 
         </button>
         </div>
 
@@ -50,14 +26,18 @@ export default function OrdersPage(){
             <span>Status</span>
           </div>
           <div className="divide-y divide-zinc-200">
-            {orders.map((order) =>(
+            {orders.map((order) =>{
+                const total = order.orderItems.reduce(
+                    (sum, item) => sum + Number(item.unitPrice) * Number(item.quantity), 0
+                );
+                return (
                 <OrderRow
                 key={order.id}
                 id={order.id}
-                customerName={order.customerName}
-                total={order.total}
+                customerName={order.customer.name}
+                total={total}
                 status={order.status}/>
-            ))}
+            )})}
           </div>
         </div>
       </section>

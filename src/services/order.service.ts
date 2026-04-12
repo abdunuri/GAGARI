@@ -1,32 +1,50 @@
 import { prisma } from "@/lib/prisma";
 
-async function createOrder() {
+
+type creatOrderInput = {
+    createdById:number;
+    bakeryId:number;
+    customerId:number;
+    orderItems:{
+        itemId:number;
+        unitPrice:number;
+        quantity:number
+    }[];
+};
+async function createOrder(orderinput:creatOrderInput) {
     const order = await prisma.order.create({
         data:{
-            userId:1,
-            customerId:1,
+            createdById:orderinput.createdById,
+            bakeryId:orderinput.bakeryId,
+            customerId:orderinput.customerId,
             orderItems:{
-                create:[
-                    {
-                        itemId:1,
-                        unitPrice:10,
-                        quantity:20
-
-                    },
-                    {
-                        itemId:2,
-                        unitPrice:20,
-                        quantity:10
-                    }
-                ]
-            }
+                create:orderinput.orderItems.map(
+                    (item)=>({
+                        itemId :item.itemId,
+                        unitPrice:item.unitPrice,
+                        quantity:item.quantity
+                    })
+                ),
+                },
         },
         include:{
             orderItems:true
         }
-    })
-    console.log("order created: ",order)
+    });
+    return order;
     
-}
+};
 
-export {createOrder}
+async function getOrders() {
+    const orders = await prisma.order.findMany(
+        {
+            include:{
+                orderItems:true,
+                customer:true
+            }
+        }
+    )
+    return orders
+};
+
+export {createOrder ,getOrders};

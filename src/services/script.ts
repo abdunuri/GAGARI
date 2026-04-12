@@ -4,10 +4,10 @@ import { $Enums } from "@prisma/client";
 async function createUser() {
     const User = await prisma.user.create({
         data:{
-            name:"Abdulber",
-            username:"abduber",
-            password:"abdulber123",
-            role:$Enums.Role.OWNER
+            name:"Abdulaziz",
+            username:"abdunuri",
+            password:"anbu123",
+            role:$Enums.Role.ADMIN
         }
     })
     console.log("user created: ",User);
@@ -18,18 +18,21 @@ async function createUser() {
 async function createOrder() {
     const order = await prisma.order.create({
         data:{
-            userId:1,
-            customerId :1   
-        }
-    }
+            createdById:9,
+            customerId:5,
+            bakeryId:5,
+        },
+        include:{
+            orderItems:true
+
+    }}
     )
-    console.log("order created",order);
-    const allorder = await prisma.order.findMany()
-    console.log(allorder)
 }
-createOrder().then (async() => { await prisma.$disconnect()})
-    .catch(async(e) =>{
-        console.log(e);
-        await prisma.$disconnect();
-        process.exit(1);
-    });
+// createOrder().then (async() => { await prisma.$disconnect()})
+//     .catch(async(e) =>{
+//         console.log(e);
+//         await prisma.$disconnect();
+//         process.exit(1);
+//     });
+
+createOrder()

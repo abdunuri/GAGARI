@@ -1,8 +1,8 @@
 type OrderRowProps = {
-    id:number;
-    customerName : String;
+    id:string;
+    customerName : string;
     total : number;
-    status : "Pending" | "Completed" | "Cancelled";
+    status : "PENDING" | "PAID" | "CANCELLED";
 };
 
 export default function OrderRow({id,customerName,total,status}:OrderRowProps){
@@ -12,8 +12,8 @@ export default function OrderRow({id,customerName,total,status}:OrderRowProps){
                     <span>{customerName}</span>
                     <span>${total}</span>
                     <span className={
-                        status==="Completed"? "font-medium text-green-600"
-                        :status ==="Pending" ? "font-medium text-yellow-600"
+                        status==="PAID"? "font-medium text-green-600"
+                        :status ==="PENDING" ? "font-medium text-yellow-600"
                         :"font-medium text-red-600"
                     }
                     
