@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 
 
 type creatOrderInput = {
-    createdById:number;
+    createdById:string;
     bakeryId:number;
     customerId:number;
     orderItems:{

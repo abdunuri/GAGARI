@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -26,11 +27,17 @@ enum OrderStatus {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  name     String
-  username String @unique
-  password String
+  id       String @id
+  name          String
+  username String?
+  email         String?
   role     Role
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
 
   bakeryId Int?
   bakery   Bakery? @relation("BakeryMembers", fields: [bakeryId], references: [id])
@@ -41,15 +48,63 @@ model User {
   createdOrders    Order[]    @relation("OrderCreatedBy")
   createdItems     Item[]     @relation("ItemCreatedBy")
 
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
 }
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
 
 model Bakery {
   id   Int    @id @default(autoincrement())
   name String
 
-  ownerId Int  @unique
+  ownerId String  @unique
   owner   User @relation("BakeryOwner", fields: [ownerId], references: [id])
 
   members   User[]     @relation("BakeryMembers")
@@ -70,7 +125,7 @@ model Customer {
   bakeryId Int
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
-  createdById Int
+  createdById String
   createdBy   User @relation("CustomerCreatedBy", fields: [createdById], references: [id])
 
   orders Order[]
@@ -88,7 +143,7 @@ model Item {
   bakeryId Int
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
-  createdById Int
+  createdById String
   createdBy   User @relation("ItemCreatedBy", fields: [createdById], references: [id])
 
   orderItems OrderItem[]
@@ -103,7 +158,7 @@ model Order {
   bakeryId Int
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
-  createdById Int
+  createdById String
   createdBy   User @relation("OrderCreatedBy", fields: [createdById], references: [id])
 
   customerId Int
