@@ -15,12 +15,17 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { SignUp } from "@/server/server"
+import { SignIn } from "@/server/sign-in"
+import { useState } from "react"
+
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+
+  const [password,setPassword] = useState("");
+  const [email,setemail] = useState("")
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -31,7 +36,9 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={async (e)=>{ 
+            e.preventDefault();
+            await SignIn(email,password)}}>
             <FieldGroup>
               <Field>
                 <Button variant="outline" type="button">
@@ -61,9 +68,10 @@ export function LoginForm({
                 <Input
                   id="email"
                   type="email"
+                  value={email}
                   placeholder="m@example.com"
                   required
-                  onClick={SignUp}
+                  onChange={(e)=>{setemail(e.target.value)}}
                 />
               </Field>
               <Field>
@@ -76,12 +84,12 @@ export function LoginForm({
                     Forgot your password?
                   </a>
                 </div>
-                <Input id="password" type="password" required />
+                <Input id="password" type="password" required value={password} onChange={(e) => {setPassword(e.target.value)}}/>
               </Field>
               <Field>
                 <Button type="submit">Login</Button>
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account? <a href="#">Sign up</a>
+                  Don&apos;t have an account? <a href="/signup">Sign up</a>
                 </FieldDescription>
               </Field>
             </FieldGroup>

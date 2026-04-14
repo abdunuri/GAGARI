@@ -1,19 +1,25 @@
-import { authClient } from "../lib/auth-client";
+import { auth } from "@/lib/auth";
 
-const { data, error } = await authClient.signUp.email({
-        email:"abdulaziznuri495@gmail.com", // user email address
-        password:"anbuabdu", // user password -> min 8 characters by default
-        name:"Abdulaziz Nuri", // user display name
-        callbackURL: "/dashboard" // A URL to redirect to after the user verifies their email (optional)
-    }, {
-        onRequest: (ctx) => {
-            //show loading
+type SignUpData = {
+    email:string,
+    password:string,
+    name:string,
+    role:string,
+    username:string
+}
+
+export async function SignUp(signupdata:SignUpData){
+
+    const response = await auth.api.signUpEmail({
+        body: {
+            email: signupdata.email,
+            password: signupdata.password,
+            name: signupdata.name,
+            role: signupdata.role,
+            username: signupdata.username,
+            callbackURL: "/dahboard",
         },
-        onSuccess: (ctx) => {
-            //redirect to the dashboard or sign in page
-        },
-        onError: (ctx) => {
-            // display the error message
-            alert(ctx.error.message);
-        },
-});
+    });
+
+    return response;
+}
