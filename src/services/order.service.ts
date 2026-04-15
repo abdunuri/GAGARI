@@ -1,9 +1,10 @@
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 
 type creatOrderInput = {
-    createdById:string;
-    bakeryId:number;
     customerId:number;
     orderItems:{
         itemId:number;
@@ -12,10 +13,19 @@ type creatOrderInput = {
     }[];
 };
 async function createOrder(orderinput:creatOrderInput) {
+    const session = await auth.api.getSession({
+        headers:await headers()
+    })
+
+    if(!session){
+        redirect(`${process.env["BETTER_AUTH_URL"]}+/login`)
+    }
+    const createdById = session.user.id;
+    const bakeryId   = session.user.bakeryId;
     const order = await prisma.order.create({
         data:{
-            createdById:orderinput.createdById,
-            bakeryId:orderinput.bakeryId,
+            createdById:createdById,
+            bakeryId:Number(bakeryId),
             customerId:orderinput.customerId,
             orderItems:{
                 create:orderinput.orderItems.map(

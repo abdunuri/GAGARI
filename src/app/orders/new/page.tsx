@@ -9,8 +9,6 @@ type OrderItemInput = {
 };
 
 export default function NewOrderPage() {
-  const [createdById, setCreatedById] = useState("");
-  const [bakeryId, setBakeryId] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [orderItems, setOrderItems] = useState<OrderItemInput[]>([
     { itemId: 0, unitPrice: 0, quantity: 1 },
@@ -52,8 +50,6 @@ export default function NewOrderPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          createdById: Number(createdById),
-          bakeryId: Number(bakeryId),
           customerId: Number(customerId),
           orderItems,
         }),
@@ -67,8 +63,6 @@ export default function NewOrderPage() {
 
       setMessage("Order created successfully");
 
-      setCreatedById("");
-      setBakeryId("");
       setCustomerId("");
       setOrderItems([{ itemId: 0, unitPrice: 0, quantity: 1 }]);
     } catch (error) {
@@ -90,28 +84,6 @@ export default function NewOrderPage() {
           onSubmit={handleSubmit}
           className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-6"
         >
-          <div>
-            <label className="mb-1 block text-sm font-medium">Created By ID</label>
-            <input
-              type="number"
-              value={createdById}
-              onChange={(e) => setCreatedById(e.target.value)}
-              className="w-full rounded-xl border px-3 py-2"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium">Bakery ID</label>
-            <input
-              type="number"
-              value={bakeryId}
-              onChange={(e) => setBakeryId(e.target.value)}
-              className="w-full rounded-xl border px-3 py-2"
-              required
-            />
-          </div>
-
           <div>
             <label className="mb-1 block text-sm font-medium">Customer ID</label>
             <input
