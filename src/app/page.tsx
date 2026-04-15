@@ -13,7 +13,7 @@ export default function Home() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <FeatureCard title="Customer" description="View customer records and track who is placing orders."/>
+          <a href="/customers"><FeatureCard title="Customer" description="View customer records and track who is placing orders."/></a>
           <FeatureCard title="Items" description="Manage your products, pricing, and availability."/>
           <a href="/orders"><FeatureCard title="Orders" description="Create orders and review order history in one workflow."/></a>
           <a href="/dashboard"><FeatureCard title="Dashboard" description="the main dashboard am protecting with authclient."/></a>

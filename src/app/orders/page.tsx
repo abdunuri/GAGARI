@@ -2,8 +2,12 @@ import OrderRow from "@/components/orders/orderRow";
 import { getOrders } from "@/services/order.service";
 import Link from "next/link";
 
+type OrdersResult = Awaited<ReturnType<typeof getOrders>>;
+type Order = OrdersResult[number];
+type OrderItem = Order["orderItems"][number];
+
 export default async function OrdersPage(){
-    const orders = await getOrders()
+  const orders: OrdersResult = await getOrders()
     return(
     <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900">
       <section className="mx-auto flex max-w-6xl flex-col gap-8">
@@ -26,9 +30,9 @@ export default async function OrdersPage(){
             <span>Status</span>
           </div>
           <div className="divide-y divide-zinc-200">
-            {orders.map((order) =>{
+            {orders.map((order: Order) =>{
                 const total = order.orderItems.reduce(
-                    (sum, item) => sum + Number(item.unitPrice) * Number(item.quantity), 0
+                (sum, item: OrderItem) => sum + Number(item.unitPrice) * Number(item.quantity), 0
                 );
                 return (
                 <OrderRow

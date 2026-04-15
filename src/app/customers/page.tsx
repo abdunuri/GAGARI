@@ -1,18 +1,44 @@
 'use client';
+import { useEffect, useState } from "react";
+import CustomerRow from "@/components/customers/customerRow";
 
-import { useState } from "react";
-
-type OrderItemInput = {
-  itemId: number;
-  unitPrice: number;
-  quantity: number;
+type Customer = {
+  id: number;
+  name: string;
+  phoneNumber: string;
 };
 
-export default function NewCustomerPage() {
+type GetCustomersResponse = {
+  message: string;
+  customers: Customer[];
+};
+
+export default function CustomerPage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setPhoneNmber] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  useEffect(() => {
+    const loadCustomers = async () => {
+      try {
+        const res = await fetch("/api/customer", { method: "GET" });
+        const data: GetCustomersResponse = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || "Failed to fetch customers");
+        }
+
+        setCustomers(data.customers);
+      } catch {
+        setMessage("Failed to load customers");
+      }
+    };
+
+    void loadCustomers();
+  }, []);
+  
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,6 +65,14 @@ export default function NewCustomerPage() {
       }
 
       setMessage("Customer created successfully");
+      setCustomers((prev) => [
+        ...prev,
+        {
+          id: data.customer.id,
+          name: data.customer.name,
+          phoneNumber: data.customer.phoneNumber,
+        },
+      ]);
 
       setCustomerName("");
       setPhoneNmber("");
@@ -96,6 +130,33 @@ export default function NewCustomerPage() {
           )}
         </form>
       </section>
+      <section className="mx-auto flex max-w-6xl flex-col gap-8">
+        <div className="flex items-center justify-between">
+          <div>
+              <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
+              <p className="text-zinc-600">View and manage customers.</p>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div className="grid grid-cols-4 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold">
+            <span>Customer ID</span>
+            <span>Customer</span>
+            <span>Phone Number</span>
+          </div>
+          <div className="divide-y divide-zinc-200">
+            {customers.map((customer: Customer) =>{
+                return (
+                <CustomerRow
+                key={customer.id}
+                id={customer.id}
+                customerName={customer.name}
+                phoneNumber={customer.phoneNumber}/>
+            )})}
+          </div>
+        </div>
+      </section>
+
     </main>
   );
 }
