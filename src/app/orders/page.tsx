@@ -1,13 +1,36 @@
 import OrderRow from "@/components/orders/orderRow";
-import { getOrders } from "@/services/order.service";
 import Link from "next/link";
 
-type OrdersResult = Awaited<ReturnType<typeof getOrders>>;
-type Order = OrdersResult[number];
-type OrderItem = Order["orderItems"][number];
+type Customer= {
+  id:string,
+  name:string,
+  phoneNumber:string,
+};
+type OrderItem = {
+  id: number,
+  itemId: number,
+  orderId: string,
+  unitPrice: number,
+  quantity: number,
+}
+
+type Order = {
+  id:string,
+  bakeryId: number,
+  createdById: string,
+  customer: Customer,
+  status: "PENDING" | "PAID" | "CANCELLED",
+  orderItems:OrderItem[]
+};
+type GetOrderResponse = {
+  message:string,
+  orders:Order[];
+};
 
 export default async function OrdersPage(){
-  const orders: OrdersResult = await getOrders()
+  const res = await fetch(`${process.env["BETTER_AUTH_URL"]}/api/order`, { method: "GET" });
+  const data: GetOrderResponse = await res.json()
+  const orders  = data.orders
     return(
     <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900">
       <section className="mx-auto flex max-w-6xl flex-col gap-8">
@@ -23,8 +46,8 @@ export default async function OrdersPage(){
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-          <div className="grid grid-cols-4 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold">
-            <span>Order ID</span>
+          <div className="grid grid-cols-3 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold">
+            
             <span>Customer</span>
             <span>Total</span>
             <span>Status</span>
@@ -37,7 +60,6 @@ export default async function OrdersPage(){
                 return (
                 <OrderRow
                 key={order.id}
-                id={order.id}
                 customerName={order.customer.name}
                 total={total}
                 status={order.status}/>

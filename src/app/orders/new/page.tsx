@@ -3,18 +3,55 @@
 import { useState } from "react";
 
 type OrderItemInput = {
-  itemId: number;
-  unitPrice: number;
-  quantity: number;
+  itemId: number,
+  unitPrice: number,
+  quantity: number,
 };
 
+type Customer = {
+  id:number,
+  name:string,
+  phoneNumber:string,
+};
+
+type Order = {
+  customer:Customer,
+  orderItems:OrderItemInput[],
+}
+
+type NewOrderResponse = {
+  message:string,
+  order:Order,
+}
+type GetCustomerResponse = {
+  message: string,
+  customers: Customer[],
+}
+
+
+import { useEffect } from "react";
+
 export default function NewOrderPage() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [orderItems, setOrderItems] = useState<OrderItemInput[]>([
     { itemId: 0, unitPrice: 0, quantity: 1 },
   ]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const res = await fetch("/api/customer", { method: "GET" });
+        const data: GetCustomerResponse = await res.json();
+        setCustomers(data.customers);
+      } catch (error) {
+        // Optionally handle error
+      }
+    };
+    fetchCustomers();
+  }, []);
 
   const handleItemChange = (
     index: number,
@@ -44,7 +81,7 @@ export default function NewOrderPage() {
     setMessage("");
 
     try {
-      const res = await fetch("/api/orders", {
+      const res = await fetch("/api/order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -55,12 +92,11 @@ export default function NewOrderPage() {
         }),
       });
 
-      const data = await res.json();
+      const data : NewOrderResponse= await res.json();
 
       if (!res.ok) {
         throw new Error(data.message || "Something went wrong");
-      }
-
+      };
       setMessage("Order created successfully");
 
       setCustomerId("");
@@ -86,13 +122,19 @@ export default function NewOrderPage() {
         >
           <div>
             <label className="mb-1 block text-sm font-medium">Customer ID</label>
-            <input
-              type="number"
+            <select
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               className="w-full rounded-xl border px-3 py-2"
               required
-            />
+            >
+              <option value="">Select Customer</option>
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name} ({customer.phoneNumber})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-4">

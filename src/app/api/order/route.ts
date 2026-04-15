@@ -25,7 +25,7 @@ export async function POST(req:Request) {
         })
 
         return NextResponse.json(
-            {message:"order created successfully"},
+            {message:"order created successfully",order},
             {status:201}
         );
     } catch (error) {

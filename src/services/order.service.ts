@@ -38,7 +38,8 @@ async function createOrder(orderinput:creatOrderInput) {
                 },
         },
         include:{
-            orderItems:true
+            orderItems:true,
+            customer:true
         }
     });
     return order;

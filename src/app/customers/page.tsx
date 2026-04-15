@@ -139,9 +139,8 @@ export default function CustomerPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-          <div className="grid grid-cols-4 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold">
-            <span>Customer ID</span>
-            <span>Customer</span>
+          <div className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold">
+            <span>Customer Name</span>
             <span>Phone Number</span>
           </div>
           <div className="divide-y divide-zinc-200">
@@ -149,7 +148,6 @@ export default function CustomerPage() {
                 return (
                 <CustomerRow
                 key={customer.id}
-                id={customer.id}
                 customerName={customer.name}
                 phoneNumber={customer.phoneNumber}/>
             )})}

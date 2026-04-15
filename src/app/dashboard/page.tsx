@@ -8,9 +8,9 @@ export default async function Dashboard(){
     })
 
     if(!session){
-        redirect(`${process.env["BETTER_AUTH_URL"]}/login`)
+        redirect(`${process.env["BETTER_AUTH_URL"]}/login`);
     }
-    const name = session.user.name
+    const name = session.user.name;
 
     return(
         <div>GREAT DASHBOARD {name}</div>
