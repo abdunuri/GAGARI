@@ -86,32 +86,32 @@ export default function CustomerPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900">
+    <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6 lg:px-8">
       <section className="mx-auto max-w-4xl">
-        <h1 className="text-3xl font-bold">New Customer</h1>
-        <p className="mb-6 text-zinc-600">Create a new Customer.</p>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">New Customer</h1>
+        <p className="mb-6 text-sm text-zinc-600 sm:text-base">Create a new customer.</p>
 
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-6"
+          className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <div>
-            <label className="mb-1 block text-sm font-medium">Customer Name</label>
+            <label className="mb-1 block text-sm font-medium text-zinc-800">Customer Name</label>
             <input
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full rounded-xl border px-3 py-2"
+              className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
               required
             />
           </div>
-                    <div>
-            <label className="mb-1 block text-sm font-medium">Phone Number</label>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-800">Phone Number</label>
             <input
               type="text"
               value={customerPhone}
               onChange={(e) => setPhoneNmber(e.target.value)}
-              className="w-full rounded-xl border px-3 py-2"
+              className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
               required
             />
           </div>
@@ -120,7 +120,7 @@ export default function CustomerPage() {
           <button
             type="submit"
             disabled={loading}
-            className="rounded-xl bg-blue-600 px-5 py-2 text-white disabled:opacity-50"
+            className="w-full rounded-full bg-zinc-900 px-5 py-3 font-medium text-white disabled:opacity-50 sm:w-auto"
           >
             {loading ? "Creating..." : "Create customer"}
           </button>
@@ -130,16 +130,16 @@ export default function CustomerPage() {
           )}
         </form>
       </section>
-      <section className="mx-auto flex max-w-6xl flex-col gap-8">
-        <div className="flex items-center justify-between">
+      <section className="mx-auto mt-10 flex max-w-6xl flex-col gap-4 sm:gap-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-              <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-              <p className="text-zinc-600">View and manage customers.</p>
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Customers</h2>
+              <p className="text-sm text-zinc-600 sm:text-base">View and manage customers.</p>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-          <div className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold">
+        <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+          <div className="hidden grid-cols-2 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold md:grid">
             <span>Customer Name</span>
             <span>Phone Number</span>
           </div>

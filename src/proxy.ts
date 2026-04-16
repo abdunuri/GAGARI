@@ -1,19 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 
+const PUBLIC_PATHS = ["/", "/login", "/signup"];
+
 export async function proxy(request: NextRequest) {
+    const { pathname } = request.nextUrl;
+
+    if (pathname.startsWith("/api/auth")) {
+        return NextResponse.next();
+    }
+
+    if (PUBLIC_PATHS.includes(pathname)) {
+        return NextResponse.next();
+    }
+
     const session = await auth.api.getSession({
-        headers: await headers()
-    })
+        headers: request.headers
+    });
 
     if(!session) {
-        return NextResponse.redirect(new URL("/login", request.url));
+        if (pathname.startsWith("/api/")) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("next", pathname);
+        return NextResponse.redirect(loginUrl);
     }
 
     return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard"], // Specify the routes the middleware applies to
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };

@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server"
 import { authClient } from "../lib/auth-client"
 
 
@@ -9,6 +10,10 @@ export async function SignIn(email:string,password:string){
             callbackURL: "/dashboard",
             rememberMe: true
     }, {
-        //callbacks
+        //
     })
+    return NextResponse.json(
+        {message:"Loged in Successfully"},
+        {status:200}
+    )
 }

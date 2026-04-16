@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { authClient } from "@/lib/auth-client";
 
 type SignUpData = {
     email:string,
@@ -10,15 +10,13 @@ type SignUpData = {
 
 export async function SignUp(signupdata:SignUpData){
 
-    const response = await auth.api.signUpEmail({
-        body: {
+    const response = await authClient.signUp.email({
             email: signupdata.email,
             password: signupdata.password,
             name: signupdata.name,
-            role: signupdata.role,
             username: signupdata.username,
-            callbackURL: "/dahboard",
-        },
+            role: signupdata.role,
+            callbackURL: "/dashboard",
     });
 
     return response;

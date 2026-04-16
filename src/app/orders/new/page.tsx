@@ -27,6 +27,15 @@ type GetCustomerResponse = {
   message: string,
   customers: Customer[],
 }
+type Item = {
+  id:number,
+  name:string,
+  price:number|string,
+};
+type GetItemResponse = {
+  message: string,
+  items: Item[],
+};
 
 
 import { useEffect } from "react";
@@ -34,8 +43,10 @@ import { useEffect } from "react";
 export default function NewOrderPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
+  const [items,setItems]  = useState<Item[]>([]);
+  const [unitPrice,setUnitPrice] = useState(0)
   const [orderItems, setOrderItems] = useState<OrderItemInput[]>([
-    { itemId: 0, unitPrice: 0, quantity: 1 },
+    { itemId: 0,unitPrice:unitPrice, quantity: 1 },
   ]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -50,7 +61,14 @@ export default function NewOrderPage() {
         // Optionally handle error
       }
     };
+    const FetchItems = async () => {
+      const res = await fetch("/api/item",{method:"GET"});
+      const data:GetItemResponse = await res.json();
+      setItems(data.items);
+    }
     fetchCustomers();
+    FetchItems();
+    console.log(customers,items)
   }, []);
 
   const handleItemChange = (
@@ -66,7 +84,7 @@ export default function NewOrderPage() {
   const addItem = () => {
     setOrderItems([
       ...orderItems,
-      { itemId: 0, unitPrice: 0, quantity: 1 },
+      { itemId: 0,unitPrice:unitPrice, quantity: 1 },
     ]);
   };
 
@@ -100,7 +118,7 @@ export default function NewOrderPage() {
       setMessage("Order created successfully");
 
       setCustomerId("");
-      setOrderItems([{ itemId: 0, unitPrice: 0, quantity: 1 }]);
+      setOrderItems([{ itemId: 0 ,unitPrice:unitPrice, quantity: 1 }]);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Failed to create order"
@@ -111,21 +129,21 @@ export default function NewOrderPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900">
+    <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6 lg:px-8">
       <section className="mx-auto max-w-4xl">
-        <h1 className="text-3xl font-bold">New Order</h1>
-        <p className="mb-6 text-zinc-600">Create a new customer order.</p>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">New Order</h1>
+        <p className="mb-6 text-sm text-zinc-600 sm:text-base">Create a new customer order.</p>
 
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-6"
+          className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <div>
-            <label className="mb-1 block text-sm font-medium">Customer ID</label>
+            <label className="mb-1 block text-sm font-medium text-zinc-800">Customer</label>
             <select
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
-              className="w-full rounded-xl border px-3 py-2"
+              className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
               required
             >
               <option value="">Select Customer</option>
@@ -138,35 +156,31 @@ export default function NewOrderPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Order Items</h2>
+            <h2 className="text-lg font-semibold text-zinc-900">Order Items</h2>
 
             {orderItems.map((item, index) => (
               <div
                 key={index}
-                className="grid grid-cols-1 gap-3 rounded-xl border p-4 md:grid-cols-4"
+                className="grid grid-cols-1 gap-3 rounded-2xl border border-zinc-200 p-4 md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-end"
               >
-                <input
-                  type="number"
-                  placeholder="Item ID"
+                <select
+                  className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                  required
                   value={item.itemId}
-                  onChange={(e) =>
-                    handleItemChange(index, "itemId", Number(e.target.value))
-                  }
-                  className="rounded-xl border px-3 py-2"
-                  required
-                />
-
-                <input
-                  type="number"
-                  placeholder="Unit Price"
-                  value={item.unitPrice}
-                  onChange={(e) =>
-                    handleItemChange(index, "unitPrice", Number(e.target.value))
-                  }
-                  className="rounded-xl border px-3 py-2"
-                  required
-                />
-
+                  onChange={(e) => {
+                    const selectedId = Number(e.target.value);
+                    const selectedItem = items.find((itm) => itm.id === selectedId);
+                    handleItemChange(index, "itemId", selectedId);
+                    handleItemChange(index, "unitPrice", selectedItem ? Number(selectedItem.price) : 0);
+                  }}
+                >
+                  <option value="">Select Item</option>
+                  {items.map((sitem) => (
+                    <option key={sitem.id} value={sitem.id}>
+                      {sitem.name}({sitem.price})
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="number"
                   placeholder="Quantity"
@@ -174,14 +188,14 @@ export default function NewOrderPage() {
                   onChange={(e) =>
                     handleItemChange(index, "quantity", Number(e.target.value))
                   }
-                  className="rounded-xl border px-3 py-2"
+                  className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                   required
                 />
 
                 <button
                   type="button"
                   onClick={() => removeItem(index)}
-                  className="rounded-xl bg-red-500 px-4 py-2 text-white"
+                  className="rounded-full bg-red-500 px-4 py-3 font-medium text-white"
                 >
                   Remove
                 </button>
@@ -191,7 +205,7 @@ export default function NewOrderPage() {
             <button
               type="button"
               onClick={addItem}
-              className="rounded-xl bg-zinc-900 px-4 py-2 text-white"
+              className="w-full rounded-full bg-zinc-900 px-4 py-3 font-medium text-white sm:w-auto"
             >
               Add Item
             </button>
@@ -200,7 +214,7 @@ export default function NewOrderPage() {
           <button
             type="submit"
             disabled={loading}
-            className="rounded-xl bg-blue-600 px-5 py-2 text-white disabled:opacity-50"
+            className="w-full rounded-full bg-zinc-900 px-5 py-3 font-medium text-white disabled:opacity-50"
           >
             {loading ? "Creating..." : "Create Order"}
           </button>
