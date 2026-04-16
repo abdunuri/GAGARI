@@ -24,6 +24,8 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const [password, setPassword] = useState("")
   const [email, setEmail] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [signInError, setSignInError] = useState("")
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -35,7 +37,16 @@ export function LoginForm({
           <form
             onSubmit={async (e) => {
               e.preventDefault()
-              await SignIn(email, password)
+              setSignInError("")
+              setIsLoading(true)
+              try {
+                await SignIn(email, password)
+              } catch (error) {
+                const message = error instanceof Error ? error.message : "Failed to sign in. Please try again."
+                setSignInError(message)
+              } finally {
+                setIsLoading(false)
+              }
             }}
           >
             <FieldGroup>
@@ -69,9 +80,14 @@ export function LoginForm({
                 />
               </Field>
               <Field>
-                <Button type="submit" className="w-full">
-                  Login
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Logging in..." : "Login"}
                 </Button>
+                {signInError ? (
+                  <FieldDescription className="pt-2 text-center text-red-600">
+                    {signInError}
+                  </FieldDescription>
+                ) : null}
                 <FieldDescription className="text-center">
                   Please if you don't have an account, get one from your Bakery Admin.
                 </FieldDescription>

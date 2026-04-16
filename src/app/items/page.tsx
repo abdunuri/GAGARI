@@ -101,28 +101,35 @@ export default function ItemPage() {
           className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-800">Item Name</label>
+            <label htmlFor="itemName" className="mb-1 block text-sm font-medium text-zinc-800">Item Name</label>
             <input
+              id="itemName"
               type="text"
               value={ItemName}
               onChange={(e) => setItemName(e.target.value)}
               className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
               required
             />
-          </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-800">Category</label>
-            <input
-              type="text"
+            <label htmlFor="itemCategory" className="mb-1 block text-sm font-medium text-zinc-800">Category</label>
+            <select
+              id="itemCategory"
               value={ItemCategory}
               onChange={(e) => setItemCategory(e.target.value)}
               className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
               required
-            />
+            >
+              <option value="">Select a category</option>
+              <option value="BREAD">Bread</option>
+              <option value="FASTF">Fast Food</option>
+              <option value="CAKE">Cake</option>
+            </select>
+          </div> 
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-800">Price</label>
+            <label htmlFor="itemPrice" className="mb-1 block text-sm font-medium text-zinc-800">Price</label>
             <input
+              id="itemPrice"
               type="text"
               value={ItemPrice}
               onChange={(e) => setItemPrice(e.target.value)}

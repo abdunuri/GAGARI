@@ -14,19 +14,24 @@ export async function proxy(request: NextRequest) {
         return NextResponse.next();
     }
 
-    const session = await auth.api.getSession({
-        headers: request.headers
-    });
-
+    let session;
+    try {
+        session = await auth.api.getSession({
+            headers: request.headers
+        });
+    } catch (error) {
+        console.error("Failed to retrieve session:", error);
+        // Fail closed: treat as unauthenticated
+        session = null;
+    }
     if(!session) {
         if (pathname.startsWith("/api/")) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
         const loginUrl = new URL("/login", request.url);
-        loginUrl.searchParams.set("next", pathname);
-        return NextResponse.redirect(loginUrl);
-    }
+        loginUrl.searchParams.set("next", pathname + request.nextUrl.search);
+        return NextResponse.redirect(loginUrl);    }
 
     return NextResponse.next();
 }

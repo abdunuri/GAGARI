@@ -14,12 +14,13 @@ async function createCustomer(newCustomerInfo:newCustomerInfo){
     })
     if(!session){
         console.log("login required")
-        redirect(`${process.env["BETTER_AUTH_URL"]+"/login"}`)
-    }
+        redirect(`${process.env["BETTER_AUTH_URL"] ?? ""}/login`)    }
 
     const createdById = session.user.id;
     const bakeryId = Number(session.user.bakeryId);
-    const customer = await prisma.customer.create({
+    if (isNaN(bakeryId)) {
+        throw new Error("Invalid bakeryId in session");
+    }    const customer = await prisma.customer.create({
         data:{
             createdById:createdById,
             name:newCustomerInfo.name,
@@ -30,13 +31,24 @@ async function createCustomer(newCustomerInfo:newCustomerInfo){
     });
     return customer;
 }
+async function getCustomer() {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+    if (!session) {
+        console.log("login required");
+        redirect(`${process.env["BETTER_AUTH_URL"]}/login`);
+    }
 
-async function getCustomer(){
+    const bakeryId = Number(session.user.bakeryId);
     const customers = await prisma.customer.findMany({
+        where: {
+            bakeryId: bakeryId
+        },
         include:{
             bakery:true
         }
-    })
+    });
 
     return customers
 }

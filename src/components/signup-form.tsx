@@ -29,6 +29,8 @@ export function SignupForm({
   const [confirmPassword,setConfirmPassword] = useState("");
   const [role,setRole] = useState("STAFF");
   const [username,setUsername] = useState("")
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
 
   return (
@@ -43,13 +45,28 @@ export function SignupForm({
         <CardContent className="px-5 sm:px-6">
           <form onSubmit={async (e) =>{
             e.preventDefault();
-            await SignUp({
-              email:email,
-              password:password,
-              role:role,
-              username:username,
-              name:name,
-            })
+            setError("");
+
+            if (confirmPassword !== password) {
+              setError("Passwords do not match.");
+              return;
+            }
+
+            try {
+              setLoading(true);
+              await SignUp({
+                email:email,
+                password:password,
+                role:role,
+                username:username,
+                name:name,
+              });
+            } catch (err) {
+              const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";
+              setError(message);
+            } finally {
+              setLoading(false);
+            }
           }}>
             <FieldGroup>
               <Field>
@@ -58,7 +75,7 @@ export function SignupForm({
                         value={name} onChange={(e) =>(setName(e.target.value))} />
               </Field>
               <Field>
-                <FieldLabel htmlFor="username">Userame</FieldLabel>
+                <FieldLabel htmlFor="username">Username</FieldLabel>
                 <Input id="username" type="text" placeholder="abdunuri" required
                         value={username} onChange={(e) =>(setUsername(e.target.value))} />
               </Field>              
@@ -87,7 +104,7 @@ export function SignupForm({
                 <Field className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field>
                     <FieldLabel htmlFor="password">Password</FieldLabel>
-                    <Input id="password" type="password" required
+                    <Input id="password" type="password" required minLength={8}
                     value={password} onChange={(e)=> (setPassword(e.target.value))}/>
                   </Field>
                   <Field>
@@ -104,7 +121,14 @@ export function SignupForm({
                 </FieldDescription>
               </Field>
               <Field>
-                <Button type="submit" className="w-full">Create Account</Button>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Creating Account..." : "Create Account"}
+                </Button>
+                {error ? (
+                  <FieldDescription className="pt-2 text-center text-red-600">
+                    {error}
+                  </FieldDescription>
+                ) : null}
                 <FieldDescription className="text-center">
                 </FieldDescription>
               </Field>

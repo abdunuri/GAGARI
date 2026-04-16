@@ -61,14 +61,16 @@ export default function NewOrderPage() {
         // Optionally handle error
       }
     };
-    const FetchItems = async () => {
-      const res = await fetch("/api/item",{method:"GET"});
-      const data:GetItemResponse = await res.json();
-      setItems(data.items);
-    }
-    fetchCustomers();
-    FetchItems();
-    console.log(customers,items)
+    const fetchItems = async () => {
+      try {
+        const res = await fetch("/api/item", { method: "GET" });
+        const data: GetItemResponse = await res.json();
+        setItems(data.items);
+      } catch (error) {
+        // Handle error appropriately
+      }
+    };    fetchCustomers();
+    fetchItems();
   }, []);
 
   const handleItemChange = (
@@ -190,6 +192,7 @@ export default function NewOrderPage() {
                   }
                   className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                   required
+                  min={1}
                 />
 
                 <button

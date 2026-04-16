@@ -15,6 +15,20 @@ export async function POST(req:Request) {
             );
         }
 
+        const invalidItem = body.orderItems.some(
+            (item: any) =>
+                !item.itemId ||
+                typeof item.unitPrice !== "number" ||
+                item.unitPrice < 0 ||
+                typeof item.quantity !== "number" ||
+                item.quantity <= 0
+        );
+        if (invalidItem) {
+            return NextResponse.json(
+                { message: "Invalid order item data" },
+                { status: 400 }
+            );
+        }
         const order = await createOrder({
             customerId:body.customerId,
             orderItems:body.orderItems.map((item:any)=>({
@@ -39,10 +53,18 @@ export async function POST(req:Request) {
 }
 
 export async function GET(req:Request){
-    const orders = await getOrders();
-    return NextResponse.json(
-            {message:"feached all orders",orders},
-            {status:200}
+    try {
+        const orders = await getOrders();
+        return NextResponse.json(
+            { message: "fetched all orders", orders },
+            { status: 200 }
         )
+    } catch (error) {
+        console.error("Failed to fetch orders", error);
+        return NextResponse.json(
+            { message: "Failed to fetch orders" },
+            { status: 500 }
+        )
+    }
 
 }

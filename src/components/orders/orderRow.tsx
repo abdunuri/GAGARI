@@ -13,8 +13,7 @@ export default function OrderRow({customerName,total,status}:OrderRowProps){
                     </div>
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 md:hidden">Total</span>
-                        <span className="font-medium text-zinc-900 md:font-normal">${total}</span>
-                    </div>
+                        <span className="font-medium text-zinc-900 md:font-normal">${total.toFixed(2)}</span>                    </div>
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 md:hidden">Status</span>
                         <span className={

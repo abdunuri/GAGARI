@@ -15,8 +15,7 @@ export default async function OrdersPage(){
   // const res = await fetch(`${process.env["BETTER_AUTH_URL"]}/api/order`, { method: "GET" });
   // const data: GetOrderResponse = await res.json()
   const orders:GetOrderResponse = await getOrders() ?? [];
-  console.log(orders)
-    return(
+  return(
     <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6 lg:px-8">
       <section className="mx-auto flex max-w-6xl flex-col gap-4 sm:gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

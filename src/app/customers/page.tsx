@@ -15,7 +15,7 @@ type GetCustomersResponse = {
 
 export default function CustomerPage() {
   const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setPhoneNmber] = useState("");
+  const [customerPhone, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -75,7 +75,7 @@ export default function CustomerPage() {
       ]);
 
       setCustomerName("");
-      setPhoneNmber("");
+      setPhoneNumber("");
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Failed to create customer"
@@ -96,8 +96,9 @@ export default function CustomerPage() {
           className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-800">Customer Name</label>
+            <label htmlFor="customerName" className="mb-1 block text-sm font-medium text-zinc-800">Customer Name</label>
             <input
+              id="customerName"
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
@@ -106,15 +107,15 @@ export default function CustomerPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-800">Phone Number</label>
+            <label htmlFor="customerPhone" className="mb-1 block text-sm font-medium text-zinc-800">Phone Number</label>
             <input
+              id="customerPhone"
               type="text"
               value={customerPhone}
-              onChange={(e) => setPhoneNmber(e.target.value)}
+              onChange={(e) => setPhoneNumber(e.target.value)}
               className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
               required
-            />
-          </div>
+            />          </div>
 
 
           <button

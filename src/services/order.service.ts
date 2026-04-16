@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 
-type creatOrderInput = {
+type createOrderInput = {
     customerId:number;
     orderItems:{
         itemId:number;
@@ -12,14 +12,13 @@ type creatOrderInput = {
         quantity:number
     }[];
 };
-async function createOrder(orderinput:creatOrderInput) {
+async function createOrder(orderinput:createOrderInput) {
     const session = await auth.api.getSession({
         headers:await headers()
     })
 
     if(!session){
-        redirect(`${process.env["BETTER_AUTH_URL"]}+/login`)
-    }
+        redirect(`${process.env["BETTER_AUTH_URL"]}/login`)    }
     const createdById = session.user.id;
     const bakeryId   = session.user.bakeryId;
     const order = await prisma.order.create({
@@ -46,15 +45,33 @@ async function createOrder(orderinput:creatOrderInput) {
     
 };
 
-async function getOrders() {
-    const orders = await prisma.order.findMany(
-        {
-            include:{
-                orderItems:true,
-                customer:true
-            }
-        }
-    )
+async function getOrders(page = 1, pageSize = 20) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    })
+
+    if (!session) {
+        redirect(`${process.env["BETTER_AUTH_URL"]}+/login`)
+    }
+
+    const bakeryId = session.user.bakeryId;
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, pageSize);
+
+    const orders = await prisma.order.findMany({
+        where: {
+            bakeryId: Number(bakeryId)
+        },
+        include:{
+            orderItems:true,
+            customer:true
+        },
+        orderBy: {
+            createdAt: "desc"
+        },
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize
+    })
     return orders
 };
 

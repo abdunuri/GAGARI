@@ -33,9 +33,8 @@ export default async function ProtectedShell({
 
             <div className="flex flex-col items-end gap-2 text-sm sm:flex-row sm:items-center">
               <span className="max-w-[11rem] rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1.5 text-right font-medium text-zinc-700 sm:max-w-none">
-                {session.user.name} · {session.user.role}
-              </span>
-              <SignOutButton />
+                {session.user.name}{session.user.role ? ` · ${session.user.role}` : ''}
+              </span>              <SignOutButton />
             </div>
           </div>
 

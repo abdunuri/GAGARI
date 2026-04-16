@@ -52,10 +52,12 @@ export default async function Dashboard(){
     })
 
     if(!session){
-        redirect(`${process.env["BETTER_AUTH_URL"]}/login`);
+        redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
     }
     const bakeryId = Number(session.user.bakeryId);
-    const role = session.user.role as keyof typeof roleCopy;
+    if (Number.isNaN(bakeryId)) {
+        throw new Error("Invalid bakeryId in session");
+    }    const role = session.user.role as keyof typeof roleCopy;
     const dashboard = roleCopy[role] ?? roleCopy.STAFF;
 
     const [customerCount, itemCount, orderCount, pendingCount, recentOrders] = await Promise.all([
@@ -145,7 +147,7 @@ export default async function Dashboard(){
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <p className="font-medium text-zinc-900">#{order.id.slice(0, 8)}</p>
-                                            <p className="text-sm text-zinc-500">{order.customer.name}</p>
+                                            <p className="text-sm text-zinc-500">{order.customer?.name ?? "Unknown"}</p>
                                         </div>
                                         <span
                                             className={
@@ -163,8 +165,7 @@ export default async function Dashboard(){
                                         Created on {new Date(order.createdAt).toLocaleDateString()}
                                     </p>
                                 </div>
-                            ))}
-                        </div>
+                            ))}                        </div>
                     </div>
                 </div>
             </section>
