@@ -1,32 +1,78 @@
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-async function createOrder() {
+
+type createOrderInput = {
+    customerId:number;
+    orderItems:{
+        itemId:number;
+        unitPrice:number;
+        quantity:number
+    }[];
+};
+async function createOrder(orderinput:createOrderInput) {
+    const session = await auth.api.getSession({
+        headers:await headers()
+    })
+
+    if(!session){
+        redirect(`${process.env["BETTER_AUTH_URL"]}/login`)    }
+    const createdById = session.user.id;
+    const bakeryId   = session.user.bakeryId;
     const order = await prisma.order.create({
         data:{
-            userId:1,
-            customerId:1,
+            createdById:createdById,
+            bakeryId:Number(bakeryId),
+            customerId:orderinput.customerId,
             orderItems:{
-                create:[
-                    {
-                        itemId:1,
-                        unitPrice:10,
-                        quantity:20
-
-                    },
-                    {
-                        itemId:2,
-                        unitPrice:20,
-                        quantity:10
-                    }
-                ]
-            }
+                create:orderinput.orderItems.map(
+                    (item)=>({
+                        itemId :item.itemId,
+                        unitPrice:item.unitPrice,
+                        quantity:item.quantity
+                    })
+                ),
+                },
         },
         include:{
-            orderItems:true
+            orderItems:true,
+            customer:true
         }
-    })
-    console.log("order created: ",order)
+    });
+    return order;
     
-}
+};
 
-export {createOrder}
+async function getOrders(page = 1, pageSize = 20) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    })
+
+    if (!session) {
+        redirect(`${process.env["BETTER_AUTH_URL"]}+/login`)
+    }
+
+    const bakeryId = session.user.bakeryId;
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, pageSize);
+
+    const orders = await prisma.order.findMany({
+        where: {
+            bakeryId: Number(bakeryId)
+        },
+        include:{
+            orderItems:true,
+            customer:true
+        },
+        orderBy: {
+            createdAt: "desc"
+        },
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize
+    })
+    return orders
+};
+
+export {createOrder ,getOrders};

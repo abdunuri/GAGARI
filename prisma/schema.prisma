@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -26,101 +27,165 @@ enum OrderStatus {
 }
 
 model User {
-  id Int @id @default(autoincrement())
-  name String
-  username String @unique
-  password String
-  role Role
+  id       String @id
+  name          String
+  username String?
+  email         String?
+  role     Role
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
 
-  ownedBakery Bakery? @relation("ownerBakery")
-  bakery Bakery @relation("BakeryUsers",fields:[bakeryId],references:[id])
-  bakeryId Int
-  customers Customer[] @relation("customerCreatedBy")
-  orders Order[] @relation("orderCreatedBy")
-  items Item[] @relation("itemCreatedBy")
+  bakeryId Int?
+  bakery   Bakery? @relation("BakeryMembers", fields: [bakeryId], references: [id])
+
+  ownedBakery Bakery? @relation("BakeryOwner")
+
+  createdCustomers Customer[] @relation("CustomerCreatedBy")
+  createdOrders    Order[]    @relation("OrderCreatedBy")
+  createdItems     Item[]     @relation("ItemCreatedBy")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+
+model Bakery {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  ownerId String  @unique
+  owner   User @relation("BakeryOwner", fields: [ownerId], references: [id])
+
+  members   User[]     @relation("BakeryMembers")
+  customers Customer[]
+  items     Item[]
+  orders    Order[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Bakery {
-  id Int @id @default(autoincrement())
-  name String
+model Customer {
+  id          Int     @id @default(autoincrement())
+  name        String
+  phoneNumber String
+  isActive    Boolean @default(true)
 
-  owner User @relation("ownerBakery",fields: [ownerId], references: [id])
-  ownerId Int @unique
+  bakeryId Int
+  bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
-  users User[] @relation("BakeryUsers")
-  items Item[]
-  customers Customer[]
+  createdById String
+  createdBy   User @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+
   orders Order[]
 
   createdAt DateTime @default(now())
-}
-
-model Customer {
-  id Int @id @default(autoincrement())
-  name String
-  phoneNumber String
-  isActive Boolean @default(true)
-
-  bakeryId Int
-  bakery Bakery @relation(fields: [bakeryId], references: [id])
-
-  createdById Int
-  createdBy User @relation("customerCreatedBy", fields: [createdById], references: [id])
-
-  orders Order[]
+  updatedAt DateTime @updatedAt
 }
 
 model Item {
-  id Int @id @default(autoincrement())
-  name String
+  id       Int      @id @default(autoincrement())
+  name     String
   category Category
-  price Float
+  price    Decimal  @db.Decimal(10, 2)
 
   bakeryId Int
-  bakery Bakery @relation(fields: [bakeryId], references: [id])
+  bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
-  createdById Int
-  createdBy User @relation("itemCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User @relation("ItemCreatedBy", fields: [createdById], references: [id])
 
   orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Order {
   id String @id @default(cuid())
 
   bakeryId Int
-  bakery Bakery @relation(fields: [bakeryId], references: [id])
+  bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
-  createdById Int
-  createdBy User @relation("orderCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User @relation("OrderCreatedBy", fields: [createdById], references: [id])
 
   customerId Int
-  customer Customer @relation(fields: [customerId], references: [id])
+  customer   Customer @relation(fields: [customerId], references: [id])
 
   orderItems OrderItem[]
-  status OrderStatus @default(PENDING)
+  status     OrderStatus @default(PENDING)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model OrderItem {
-  id Int @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   isRemoved Boolean @default(false)
 
   itemId Int
-  item Item @relation(fields: [itemId], references: [id])
+  item   Item @relation(fields: [itemId], references: [id])
 
   orderId String
-  order Order @relation(fields: [orderId], references: [id])
+  order   Order @relation(fields: [orderId], references: [id])
 
-  unitPrice Float
-  quantity Int
-  @@unique([itemId, orderId])
+  unitPrice Decimal @db.Decimal(10, 2)
+  quantity  Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([itemId, orderId])
 }
