@@ -23,7 +23,7 @@ export const auth = betterAuth({
             bakeryId:{
                 type:"string",
                 required:true,
-                defaultValue:1
+                defaultValue:"1"
             }
         },
     },
