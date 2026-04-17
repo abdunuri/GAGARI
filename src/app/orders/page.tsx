@@ -15,6 +15,8 @@ export default async function OrdersPage(){
   // const res = await fetch(`${process.env["BETTER_AUTH_URL"]}/api/order`, { method: "GET" });
   // const data: GetOrderResponse = await res.json()
   const orders:GetOrderResponse = await getOrders() ?? [];
+  const pending = orders.filter((order) => order.status === "PENDING").length;
+  const paid = orders.filter((order) => order.status === "PAID").length;
   return(
     <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6 lg:px-8">
       <section className="mx-auto flex max-w-6xl flex-col gap-4 sm:gap-6">
@@ -27,6 +29,21 @@ export default async function OrdersPage(){
         <Link href="/orders/new" className="inline-flex w-full items-center justify-center rounded-full bg-zinc-900 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-700 sm:w-auto">
            New Order
         </Link>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Total Orders</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight">{orders.length}</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Pending</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-amber-600">{pending}</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Paid</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-emerald-600">{paid}</p>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
