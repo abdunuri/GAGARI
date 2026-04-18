@@ -57,8 +57,11 @@ export default async function Dashboard(){
     const bakeryId = Number(session.user.bakeryId);
     if (Number.isNaN(bakeryId)) {
         throw new Error("Invalid bakeryId in session");
-    }    const role = session.user.role as keyof typeof roleCopy;
+    }
+
+    const role = session.user.role as keyof typeof roleCopy;
     const dashboard = roleCopy[role] ?? roleCopy.STAFF;
+    const showStats = role === "ADMIN" || role === "OWNER";
 
     const [customerCount, itemCount, orderCount, pendingCount, recentOrders] = await Promise.all([
         prisma.customer.count({ where: { bakeryId } }),
@@ -97,15 +100,17 @@ export default async function Dashboard(){
                                 </p>
                             </div>
 
-                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                {stats.map((stat) => (
-                                    <div key={stat.label} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-                                        <p className="text-sm text-zinc-500">{stat.label}</p>
-                                        <p className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{stat.value}</p>
-                                        <p className="mt-1 text-xs text-zinc-500">{stat.hint}</p>
-                                    </div>
-                                ))}
-                            </div>
+                            {showStats && (
+                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    {stats.map((stat) => (
+                                        <div key={stat.label} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+                                            <p className="text-sm text-zinc-500">{stat.label}</p>
+                                            <p className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{stat.value}</p>
+                                            <p className="mt-1 text-xs text-zinc-500">{stat.hint}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

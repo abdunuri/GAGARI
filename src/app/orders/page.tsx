@@ -31,7 +31,7 @@ export default async function OrdersPage(){
         </Link>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 grid-cols-3">
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Total Orders</p>
             <p className="mt-2 text-2xl font-semibold tracking-tight">{orders.length}</p>

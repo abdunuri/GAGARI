@@ -43,7 +43,26 @@ type GetItemResponse = {
 
 type Mode = "single" | "bulk";
 
+type BulkDraftOrder = {
+  customerId: number;
+  items: {
+    itemId: number;
+    quantity: number;
+    unitPrice: number;
+  }[];
+};
+
+type BulkOrderDraft = {
+  savedAt: number;
+  expiresAt: number;
+  orders: BulkDraftOrder[];
+  selectedItemId: string;
+};
+
 import { useRouter } from "next/navigation";
+
+const BULK_DRAFT_STORAGE_KEY = "bulk-order-draft";
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function NewOrderPage() {
   const router = useRouter();
@@ -58,7 +77,9 @@ export default function NewOrderPage() {
   const [bulkQuantities, setBulkQuantities] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [draftInfo, setDraftInfo] = useState<{ savedAt: number; restored: boolean } | null>(null);
   const bulkQuantityRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const hasHydratedDraft = useRef(false);
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -128,6 +149,106 @@ export default function NewOrderPage() {
 
   const bulkTotal = bulkRows.reduce((sum, row) => sum + row.quantity, 0);
   const bulkOrderCount = bulkRows.filter((row) => row.quantity > 0).length;
+
+  const clearBulkDraft = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.removeItem(BULK_DRAFT_STORAGE_KEY);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || hasHydratedDraft.current) {
+      return;
+    }
+
+    hasHydratedDraft.current = true;
+
+    const raw = window.localStorage.getItem(BULK_DRAFT_STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as BulkOrderDraft;
+      const now = Date.now();
+
+      if (
+        !parsed ||
+        typeof parsed.savedAt !== "number" ||
+        typeof parsed.expiresAt !== "number" ||
+        now > parsed.expiresAt
+      ) {
+        clearBulkDraft();
+        return;
+      }
+
+      const restoredQuantities: Record<number, number> = {};
+      for (const order of parsed.orders ?? []) {
+        restoredQuantities[order.customerId] = Number(order.items?.[0]?.quantity ?? 0);
+      }
+
+      if (parsed.selectedItemId) {
+        setSelectedItemId(parsed.selectedItemId);
+      }
+      setBulkQuantities((current) => ({ ...current, ...restoredQuantities }));
+      setActiveMode("bulk");
+      setDraftInfo({ savedAt: parsed.savedAt, restored: true });
+    } catch {
+      clearBulkDraft();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasHydratedDraft.current) {
+      return;
+    }
+
+    if (activeMode !== "bulk") {
+      return;
+    }
+
+    const rowsToStore = customers
+      .map((customer) => {
+        const quantity = bulkQuantities[customer.id] ?? 0;
+        return {
+          customer,
+          quantity,
+        };
+      })
+      .filter((row) => row.quantity > 0);
+    const hasDraft = rowsToStore.length > 0 || Boolean(selectedItemId);
+
+    if (!hasDraft) {
+      clearBulkDraft();
+      setDraftInfo(null);
+      return;
+    }
+
+    const now = Date.now();
+    const draft: BulkOrderDraft = {
+      savedAt: now,
+      expiresAt: now + ONE_DAY_MS,
+      selectedItemId,
+      orders: rowsToStore.map((row) => ({
+        customerId: row.customer.id,
+        items: [
+          {
+            itemId: Number(selectedItemId) || 0,
+            quantity: row.quantity,
+            unitPrice: selectedBreadPrice,
+          },
+        ],
+      })),
+    };
+
+    window.localStorage.setItem(BULK_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    setDraftInfo((previous) => ({
+      savedAt: now,
+      restored: previous?.restored ?? false,
+    }));
+  }, [activeMode, bulkQuantities, customers, selectedBreadPrice, selectedItemId]);
 
   const handleItemChange = (
     index: number,
@@ -237,6 +358,8 @@ export default function NewOrderPage() {
         }
         return next;
       });
+      clearBulkDraft();
+      setDraftInfo(null);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to create bulk orders");
@@ -412,6 +535,25 @@ export default function NewOrderPage() {
               onSubmit={handleBulkSubmit}
               className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
             >
+              {draftInfo && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 sm:text-sm">
+                  <p>
+                    {draftInfo.restored ? "Draft restored." : "Draft saved."} Last update: {new Date(draftInfo.savedAt).toLocaleTimeString()}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkQuantities({});
+                      setSelectedItemId("");
+                      clearBulkDraft();
+                      setDraftInfo(null);
+                    }}
+                    className="rounded-full border border-zinc-300 bg-white px-3 py-1 font-medium text-zinc-700 hover:border-zinc-400 hover:bg-zinc-100"
+                  >
+                    Discard Draft
+                  </button>
+                </div>
+              )}
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-800">Bread Item</label>
