@@ -30,20 +30,6 @@ export default async function OrdersPage(){
         </Link>
         </div>
 
-        <div className="grid gap-3 grid-cols-3">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Total Orders</p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight">{orders.length}</p>
-          </div>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Pending</p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-amber-600">{pending}</p>
-          </div>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Paid</p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-emerald-600">{paid}</p>
-          </div>
-        </div>
 
         <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
           <div className="grid-cols-3 gap-1 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold grid">
@@ -63,6 +49,20 @@ export default async function OrdersPage(){
                 total={total}
                 status={order.status}/>
             )})}
+          </div>
+        </div>
+        <div className="grid gap-3 grid-cols-3">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Total Orders</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight">{orders.length}</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Pending</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-amber-600">{pending}</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Paid</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-emerald-600">{paid}</p>
           </div>
         </div>
       </section>
