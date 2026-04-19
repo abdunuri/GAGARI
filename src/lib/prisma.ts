@@ -8,8 +8,8 @@ if (!connectionString) {
 	throw new Error("DATABASE_URL is not set.");
 }
 
-const parsedPoolMax = Number(process.env.PRISMA_POOL_MAX ?? "5");
-const poolMax = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : 5;
+const parsedPoolMax = Number(process.env.PRISMA_POOL_MAX ?? "1");
+const poolMax = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : 1;
 
 const createPrismaClient = () => {
 	const adapter = new PrismaPg({
