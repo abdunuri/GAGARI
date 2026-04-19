@@ -91,7 +91,7 @@ export default function ProductPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_0%_0%,_#fff7ed_0%,_#ffffff_42%,_#ecfeff_100%)] px-4 py-6 text-zinc-900 sm:px-6 lg:px-8">
       <section className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[360px_1fr] xl:grid-cols-[420px_1fr]">
         <div className="space-y-4 lg:sticky lg:top-28 lg:self-start">
           <div>
@@ -101,7 +101,7 @@ export default function ProductPage() {
 
           <form
             onSubmit={handleSubmit}
-            className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
+            className="space-y-5 rounded-3xl border border-zinc-200/80 bg-white/90 p-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)] backdrop-blur sm:p-6"
           >
             <div>
               <label htmlFor="productName" className="mb-1 block text-sm font-medium text-zinc-800">Product Name</label>
@@ -110,7 +110,7 @@ export default function ProductPage() {
                 type="text"
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
-                className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 outline-none transition focus:border-amber-300 focus:ring-4 focus:ring-amber-100"
                 required
               />
             </div>
@@ -120,7 +120,7 @@ export default function ProductPage() {
                 id="productCategory"
                 value={productCategory}
                 onChange={(e) => setProductCategory(e.target.value)}
-                className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 outline-none transition focus:border-amber-300 focus:ring-4 focus:ring-amber-100"
                 required
               >
                 <option value="">Select a category</option>
@@ -136,7 +136,7 @@ export default function ProductPage() {
                 type="text"
                 value={productPrice}
                 onChange={(e) => setProductPrice(e.target.value)}
-                className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 outline-none transition focus:border-amber-300 focus:ring-4 focus:ring-amber-100"
                 required
               />
             </div>
@@ -144,13 +144,13 @@ export default function ProductPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-full bg-zinc-900 px-5 py-3 font-medium text-white disabled:opacity-50"
+              className="w-full rounded-full bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 px-5 py-3 font-medium text-white shadow-[0_16px_30px_-20px_rgba(24,24,27,0.95)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Creating..." : "Create Product"}
             </button>
 
             {message && (
-              <p className="text-sm text-zinc-700">{message}</p>
+              <p className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">{message}</p>
             )}
           </form>
         </div>
@@ -163,11 +163,11 @@ export default function ProductPage() {
           </div>
           </div>
 
-          <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
-            <div className="hidden grid-cols-3 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold md:grid">
-              <span>Product Name</span>
-              <span>Product Category</span>
-              <span>Product Price</span>
+          <div className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/90 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)] backdrop-blur">
+            <div className="grid grid-cols-3 border-b border-zinc-200 bg-gradient-to-r from-zinc-100 to-zinc-50 px-6 py-4 text-sm font-semibold">
+              <span>Product</span>
+              <span>Category</span>
+              <span>Price</span>
             </div>
             <div className="divide-y divide-zinc-200">
               {products.map((product: Product) =>{
