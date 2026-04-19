@@ -6,7 +6,12 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-zinc-900" />
+            {/* gagari logo */}
+            <img
+              src="Gagari_Logo.png"
+              alt="GaGari Logo"
+              className="h-8 w-8 rounded-full object-cover"
+            />
             <div>
               <p className="text-base font-semibold tracking-tight">GaGari</p>
               <p className="text-xs text-zinc-500">Bakery Operations Platform</p>
