@@ -1,16 +1,12 @@
 import OrderRow from "@/components/orders/orderRow";
 import { getOrders } from "@/services/order.service";
+import { Decimal } from "@prisma/client/runtime/client";
 import Link from "next/link";
 
-type Customer= {
-  id:string,
-  name:string,
-  phoneNumber:string,
-};
 type GetOrderResponse =  Awaited<ReturnType< typeof getOrders>>;
 type Order = GetOrderResponse[number];
 type OrderProduct = {
-  unitPrice: number;
+  unitPrice: Decimal;
   quantity: number;
 };
 
