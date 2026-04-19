@@ -46,7 +46,7 @@ model User {
 
   createdCustomers Customer[] @relation("CustomerCreatedBy")
   createdOrders    Order[]    @relation("OrderCreatedBy")
-  createdItems     Item[]     @relation("ItemCreatedBy")
+  createdProducts  Product[]  @relation("ProductCreatedBy")
 
   @@map("user")
 }
@@ -109,7 +109,7 @@ model Bakery {
 
   members   User[]     @relation("BakeryMembers")
   customers Customer[]
-  items     Item[]
+  products  Product[]
   orders    Order[]
 
   createdAt DateTime @default(now())
@@ -134,7 +134,7 @@ model Customer {
   updatedAt DateTime @updatedAt
 }
 
-model Item {
+model Product {
   id       Int      @id @default(autoincrement())
   name     String
   category Category
@@ -144,12 +144,14 @@ model Item {
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
   createdById String
-  createdBy   User @relation("ItemCreatedBy", fields: [createdById], references: [id])
+  createdBy   User @relation("ProductCreatedBy", fields: [createdById], references: [id])
 
-  orderItems OrderItem[]
+  orderProducts OrderProduct[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@map("Item")
 }
 
 model Order {
@@ -164,19 +166,19 @@ model Order {
   customerId Int
   customer   Customer @relation(fields: [customerId], references: [id])
 
-  orderItems OrderItem[]
+  orderProducts OrderProduct[]
   status     OrderStatus @default(PENDING)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model OrderItem {
+model OrderProduct {
   id        Int     @id @default(autoincrement())
   isRemoved Boolean @default(false)
 
-  itemId Int
-  item   Item @relation(fields: [itemId], references: [id])
+  productId Int @map("itemId")
+  product   Product @relation(fields: [productId], references: [id])
 
   orderId String
   order   Order @relation(fields: [orderId], references: [id])
@@ -187,5 +189,6 @@ model OrderItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([itemId, orderId])
+  @@unique([productId, orderId])
+  @@map("OrderItem")
 }

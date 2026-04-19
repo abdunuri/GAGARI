@@ -9,7 +9,10 @@ type Customer= {
 };
 type GetOrderResponse =  Awaited<ReturnType< typeof getOrders>>;
 type Order = GetOrderResponse[number];
-type OrderItem = Order["orderItems"][number]
+type OrderProduct = {
+  unitPrice: number;
+  quantity: number;
+};
 
 export default async function OrdersPage(){
   // const res = await fetch(`${process.env["BETTER_AUTH_URL"]}/api/order`, { method: "GET" });
@@ -54,8 +57,8 @@ export default async function OrdersPage(){
           </div>
           <div className="divide-y divide-zinc-200">
             {orders.map((order: Order) =>{
-                const total = order.orderItems.reduce(
-                (sum, item: OrderItem) => sum + Number(item.unitPrice) * Number(item.quantity), 0
+                const total = (order.orderProducts as OrderProduct[]).reduce(
+              (sum, product: OrderProduct) => sum + Number(product.unitPrice) * Number(product.quantity), 0
                 );
                 return (
                 <OrderRow

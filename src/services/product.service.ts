@@ -4,12 +4,12 @@ import { Decimal } from "@prisma/client/runtime/client"
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-type newItem  = {
+type newProduct  = {
     name:string,
     category:  "BREAD" | "FASTF" | "CAKE",
     price:Decimal,
 };
-async function CreateItem(newItem:newItem){
+async function CreateProduct(newProduct:newProduct){
     const session = await auth.api.getSession({
         headers:await headers()
     })
@@ -23,29 +23,29 @@ async function CreateItem(newItem:newItem){
     const bakeryId = Number.parseInt(String(rawBakeryId), 10);
 
     if (Number.isNaN(bakeryId)) {
-        console.error("CreateItem rejected due to invalid bakeryId", {
+        console.error("CreateProduct rejected due to invalid bakeryId", {
             userId: session.user.id,
             bakeryId: rawBakeryId,
         });
         throw new TypeError("Invalid bakeryId in user session");
     }
 
-    const item = await prisma.item.create({
+    const product = await prisma.product.create({
         data:{
-            name:newItem.name,
-            category:newItem.category,
-            price:newItem.price,
+            name:newProduct.name,
+            category:newProduct.category,
+            price:newProduct.price,
             bakeryId:bakeryId,
             createdById:createdById,
 
         },
     });
 
-    return item;
+    return product;
 }
 
 
-async function GetItems() {
+async function GetProducts() {
     const session = await auth.api.getSession({
         headers: await headers()
     });
@@ -56,17 +56,17 @@ async function GetItems() {
 
     const bakeryId = Number.parseInt(String(session.user.bakeryId), 10);
     if (Number.isNaN(bakeryId)) {
-        console.error("GetItems rejected due to invalid bakeryId", {
+        console.error("GetProducts rejected due to invalid bakeryId", {
             userId: session.user.id,
             bakeryId: session.user.bakeryId,
         });
         throw new Error("User does not have a valid bakeryId");
     }
 
-    const items = await prisma.item.findMany({
+    const products = await prisma.product.findMany({
         where: { bakeryId }
     });
-    return items
+    return products
 }
 
-export {CreateItem,GetItems}
+export {CreateProduct,GetProducts}

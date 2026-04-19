@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type OrderItemInput = {
-  itemId: number;
+type OrderProductInput = {
+  productId: number;
   unitPrice: number;
   quantity: number;
 };
@@ -16,7 +16,7 @@ type Customer = {
 
 type Order = {
   customer: Customer;
-  orderItems: OrderItemInput[];
+  orderProducts: OrderProductInput[];
 };
 
 type NewOrderResponse = {
@@ -29,24 +29,24 @@ type GetCustomerResponse = {
   customers: Customer[];
 };
 
-type Item = {
+type Product = {
   id: number;
   name: string;
   price: number | string;
   category: "BREAD" | "FASTF" | "CAKE";
 };
 
-type GetItemResponse = {
+type GetProductResponse = {
   message: string;
-  items: Item[];
+  products: Product[];
 };
 
 type Mode = "single" | "bulk";
 
 type BulkDraftOrder = {
   customerId: number;
-  items: {
-    itemId: number;
+  products: {
+    productId: number;
     quantity: number;
     unitPrice: number;
   }[];
@@ -56,7 +56,7 @@ type BulkOrderDraft = {
   savedAt: number;
   expiresAt: number;
   orders: BulkDraftOrder[];
-  selectedItemId: string;
+  selectedProductId: string;
 };
 
 import { useRouter } from "next/navigation";
@@ -69,10 +69,10 @@ export default function NewOrderPage() {
   const [activeMode, setActiveMode] = useState<Mode>("bulk");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
-  const [items, setItems] = useState<Item[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState("");
-  const [orderItems, setOrderItems] = useState<OrderItemInput[]>([
-    { itemId: 0, unitPrice: 0, quantity: 1 },
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [orderProducts, setOrderProducts] = useState<OrderProductInput[]>([
+    { productId: 0, unitPrice: 0, quantity: 1 },
   ]);
   const [bulkQuantities, setBulkQuantities] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
@@ -102,39 +102,39 @@ export default function NewOrderPage() {
       }
     };
 
-    const fetchItems = async () => {
+    const fetchProducts = async () => {
       try {
-        const res = await fetch("/api/item", { method: "GET" });
-        const data: GetItemResponse = await res.json();
-        setItems(data.items);
+        const res = await fetch("/api/product", { method: "GET" });
+        const data: GetProductResponse = await res.json();
+        setProducts(data.products);
 
-        const breadItems = data.items.filter((item) => item.category === "BREAD");
-        if (breadItems.length > 0) {
-          setSelectedItemId((current) => current || String(breadItems[0].id));
+        const breadProducts = data.products.filter((product) => product.category === "BREAD");
+        if (breadProducts.length > 0) {
+          setSelectedProductId((current) => current || String(breadProducts[0].id));
         }
       } catch {
-        setMessage("Failed to load items");
+        setMessage("Failed to load products");
       }
     };
 
     void fetchCustomers();
-    void fetchItems();
+    void fetchProducts();
   }, []);
 
-  const breadItems = useMemo(
-    () => items.filter((item) => item.category === "BREAD"),
-    [items]
+  const breadProducts = useMemo(
+    () => products.filter((product) => product.category === "BREAD"),
+    [products]
   );
 
-  const selectedBreadItem = useMemo(
-    () => breadItems.find((item) => item.id === Number(selectedItemId)),
-    [breadItems, selectedItemId]
+  const selectedBreadProduct = useMemo(
+    () => breadProducts.find((product) => product.id === Number(selectedProductId)),
+    [breadProducts, selectedProductId]
   );
 
-  const selectedBreadPrice = Number(selectedBreadItem?.price ?? 0);
+  const selectedBreadPrice = Number(selectedBreadProduct?.price ?? 0);
 
-  const singleOrderTotal = orderItems.reduce(
-    (sum, item) => sum + Number(item.unitPrice) * Number(item.quantity),
+  const singleOrderTotal = orderProducts.reduce(
+    (sum, product) => sum + Number(product.unitPrice) * Number(product.quantity),
     0
   );
 
@@ -186,11 +186,11 @@ export default function NewOrderPage() {
 
       const restoredQuantities: Record<number, number> = {};
       for (const order of parsed.orders ?? []) {
-        restoredQuantities[order.customerId] = Number(order.items?.[0]?.quantity ?? 0);
+        restoredQuantities[order.customerId] = Number(order.products?.[0]?.quantity ?? 0);
       }
 
-      if (parsed.selectedItemId) {
-        setSelectedItemId(parsed.selectedItemId);
+      if (parsed.selectedProductId) {
+        setSelectedProductId(parsed.selectedProductId);
       }
       setBulkQuantities((current) => ({ ...current, ...restoredQuantities }));
       setActiveMode("bulk");
@@ -218,7 +218,7 @@ export default function NewOrderPage() {
         };
       })
       .filter((row) => row.quantity > 0);
-    const hasDraft = rowsToStore.length > 0 || Boolean(selectedItemId);
+    const hasDraft = rowsToStore.length > 0 || Boolean(selectedProductId);
 
     if (!hasDraft) {
       clearBulkDraft();
@@ -230,12 +230,12 @@ export default function NewOrderPage() {
     const draft: BulkOrderDraft = {
       savedAt: now,
       expiresAt: now + ONE_DAY_MS,
-      selectedItemId,
+      selectedProductId,
       orders: rowsToStore.map((row) => ({
         customerId: row.customer.id,
-        items: [
+        products: [
           {
-            itemId: Number(selectedItemId) || 0,
+            productId: Number(selectedProductId) || 0,
             quantity: row.quantity,
             unitPrice: selectedBreadPrice,
           },
@@ -248,27 +248,27 @@ export default function NewOrderPage() {
       savedAt: now,
       restored: previous?.restored ?? false,
     }));
-  }, [activeMode, bulkQuantities, customers, selectedBreadPrice, selectedItemId]);
+  }, [activeMode, bulkQuantities, customers, selectedBreadPrice, selectedProductId]);
 
-  const handleItemChange = (
+  const handleProductChange = (
     index: number,
-    field: keyof OrderItemInput,
+    field: keyof OrderProductInput,
     value: number
   ) => {
-    const updated = [...orderItems];
+    const updated = [...orderProducts];
     updated[index][field] = value;
-    setOrderItems(updated);
+    setOrderProducts(updated);
   };
 
-  const addItem = () => {
-    setOrderItems((current) => [
+  const addProduct = () => {
+    setOrderProducts((current) => [
       ...current,
-      { itemId: 0, unitPrice: 0, quantity: 1 },
+      { productId: 0, unitPrice: 0, quantity: 1 },
     ]);
   };
 
-  const removeItem = (index: number) => {
-    setOrderItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  const removeProduct = (index: number) => {
+    setOrderProducts((current) => current.filter((_, productIndex) => productIndex !== index));
   };
 
   const handleSingleSubmit = async (e: React.FormEvent) => {
@@ -284,7 +284,7 @@ export default function NewOrderPage() {
         },
         body: JSON.stringify({
           customerId: Number(customerId),
-          orderItems,
+          orderProducts,
         }),
       });
 
@@ -296,7 +296,7 @@ export default function NewOrderPage() {
 
       setMessage("Order created successfully");
       setCustomerId("");
-      setOrderItems([{ itemId: 0, unitPrice: 0, quantity: 1 }]);
+      setOrderProducts([{ productId: 0, unitPrice: 0, quantity: 1 }]);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to create order");
@@ -311,8 +311,8 @@ export default function NewOrderPage() {
     setMessage("");
 
     try {
-      if (!selectedBreadItem) {
-        throw new Error("Select a bread item first");
+      if (!selectedBreadProduct) {
+        throw new Error("Select a bread product first");
       }
 
       const rowsToSubmit = bulkRows.filter((row) => row.quantity > 0);
@@ -330,9 +330,9 @@ export default function NewOrderPage() {
             },
             body: JSON.stringify({
               customerId: row.customer.id,
-              orderItems: [
+              orderProducts: [
                 {
-                  itemId: selectedBreadItem.id,
+                  productId: selectedBreadProduct.id,
                   unitPrice: selectedBreadPrice,
                   quantity: row.quantity,
                 },
@@ -433,9 +433,9 @@ export default function NewOrderPage() {
               </div>
 
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-zinc-900">Order Items</h2>
+                <h2 className="text-lg font-semibold text-zinc-900">Order Products</h2>
 
-                {orderItems.map((item, index) => (
+                {orderProducts.map((product, index) => (
                   <div
                     key={index}
                     className="relative grid grid-cols-2 gap-3 rounded-2xl border border-zinc-200 p-4 pr-12 md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-end md:pr-4"
@@ -443,27 +443,27 @@ export default function NewOrderPage() {
                     <select
                       className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                       required
-                      value={item.itemId}
+                      value={product.productId}
                       onChange={(e) => {
                         const selectedId = Number(e.target.value);
-                        const selectedItem = items.find((itm) => itm.id === selectedId);
-                        handleItemChange(index, "itemId", selectedId);
-                        handleItemChange(index, "unitPrice", selectedItem ? Number(selectedItem.price) : 0);
+                        const selectedProduct = products.find((productItem) => productItem.id === selectedId);
+                        handleProductChange(index, "productId", selectedId);
+                        handleProductChange(index, "unitPrice", selectedProduct ? Number(selectedProduct.price) : 0);
                       }}
                     >
-                      <option value="">Select Item</option>
-                      {items.map((sitem) => (
-                        <option key={sitem.id} value={sitem.id}>
-                          {sitem.name} ({sitem.price})
+                      <option value="">Select Product</option>
+                      {products.map((productOption) => (
+                        <option key={productOption.id} value={productOption.id}>
+                          {productOption.name} ({productOption.price})
                         </option>
                       ))}
                     </select>
                     <input
                       type="number"
                       placeholder="Quantity"
-                      value={item.quantity}
+                      value={product.quantity}
                       onChange={(e) =>
-                        handleItemChange(index, "quantity", Number(e.target.value))
+                        handleProductChange(index, "quantity", Number(e.target.value))
                       }
                       className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                       required
@@ -472,8 +472,8 @@ export default function NewOrderPage() {
 
                     <button
                       type="button"
-                      onClick={() => removeItem(index)}
-                      aria-label={`Remove item row ${index + 1}`}
+                      onClick={() => removeProduct(index)}
+                      aria-label={`Remove product row ${index + 1}`}
                       className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 md:static md:h-10 md:w-10 md:self-end"
                     >
                       <svg
@@ -498,10 +498,10 @@ export default function NewOrderPage() {
 
                 <button
                   type="button"
-                  onClick={addItem}
+                  onClick={addProduct}
                   className="w-full rounded-full bg-zinc-900 px-4 py-3 font-medium text-white sm:w-auto"
                 >
-                  Add Item
+                  Add Product
                 </button>
               </div>
 
@@ -518,11 +518,11 @@ export default function NewOrderPage() {
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Order Summary</p>
                 <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">${singleOrderTotal.toFixed(2)}</p>
-                <p className="mt-1 text-sm text-zinc-600">Estimated total for the current item selection.</p>
+                <p className="mt-1 text-sm text-zinc-600">Estimated total for the current product selection.</p>
               </div>
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Items Count</p>
-                <p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">{orderItems.length}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Products Count</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">{orderProducts.length}</p>
                 <p className="mt-1 text-sm text-zinc-600">Update quantities before final submission.</p>
               </div>
             </aside>
@@ -544,7 +544,7 @@ export default function NewOrderPage() {
                     type="button"
                     onClick={() => {
                       setBulkQuantities({});
-                      setSelectedItemId("");
+                      setSelectedProductId("");
                       clearBulkDraft();
                       setDraftInfo(null);
                     }}
@@ -556,22 +556,22 @@ export default function NewOrderPage() {
               )}
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-800">Bread Item</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-800">Bread Product</label>
                 <select
-                  value={selectedItemId}
-                  onChange={(e) => setSelectedItemId(e.target.value)}
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
                   className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                   required
                 >
-                  <option value="">Select Bread Item</option>
-                  {breadItems.map((bread) => (
+                  <option value="">Select Bread Product</option>
+                  {breadProducts.map((bread) => (
                     <option key={bread.id} value={bread.id}>
                       {bread.name} ({bread.price})
                     </option>
                   ))}
                 </select>
                 <p className="mt-2 text-xs text-zinc-500">
-                  Only items in the BREAD category are shown here.
+                  Only products in the BREAD category are shown here.
                 </p>
               </div>
 
@@ -589,7 +589,9 @@ export default function NewOrderPage() {
                     >
                       <div>
                         <p className="text-sm font-medium text-zinc-900 md:text-base">{row.customer.name}</p>
-                        <p className="text-xs text-zinc-500 md:text-sm">{row.customer.phoneNumber}</p>
+                        <a href={`tel:${row.customer.phoneNumber}`} className="text-xs text-zinc-500 md:text-sm">
+                          {row.customer.phoneNumber}
+                        </a>
                       </div>
 
                       <div>
@@ -649,10 +651,10 @@ export default function NewOrderPage() {
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Selected Bread</p>
                 <p className="mt-2 text-lg font-semibold text-zinc-900">
-                  {selectedBreadItem ? selectedBreadItem.name : "No bread selected"}
+                  {selectedBreadProduct ? selectedBreadProduct.name : "No bread selected"}
                 </p>
                 <p className="mt-1 text-sm text-zinc-600">
-                  {selectedBreadItem ? `Unit price: $${selectedBreadPrice.toFixed(2)}` : "Choose a bread item to continue."}
+                  {selectedBreadProduct ? `Unit price: $${selectedBreadPrice.toFixed(2)}` : "Choose a bread product to continue."}
                 </p>
               </div>
             </aside>

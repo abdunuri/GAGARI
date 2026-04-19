@@ -19,15 +19,25 @@ import { Input } from "@/components/ui/input"
 import { useState } from "react"
 import { SignUp } from "@/server/sign-up"
 
+type CurrentUserRole = "ADMIN" | "OWNER"
+type Role = "ADMIN" | "OWNER" | "STAFF" | "VIEWER"
+
+const ROLE_OPTIONS: Record<CurrentUserRole, Role[]> = {
+  ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
+  OWNER: ["STAFF", "VIEWER"],
+}
+
 export function SignupForm({
   className,
+  currentUserRole,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & { currentUserRole: CurrentUserRole }) {
+  const availableRoles = ROLE_OPTIONS[currentUserRole]
   const [email,setEmail] = useState("");
   const [name,setName] = useState("")
   const [password,setPassword] = useState("");
   const [confirmPassword,setConfirmPassword] = useState("");
-  const [role,setRole] = useState("STAFF");
+  const [role,setRole] = useState<Role>(availableRoles[0]);
   const [username,setUsername] = useState("")
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -60,6 +70,7 @@ export function SignupForm({
                 role:role,
                 username:username,
                 name:name,
+                currentUserRole,
               });
             } catch (err) {
               const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";
@@ -93,11 +104,12 @@ export function SignupForm({
                   <Field>
                     <FieldLabel htmlFor="role">Role</FieldLabel>
                     <select id="role"  required className="w-full rounded-xl border px-3 py-2"
-                    value={role} onChange={(e)=> (setRole(e.target.value))}>
-                      <option value={"STAFF"} className="divide-y divide-zinc-200">STAFF</option>
-                      <option value={"ADMIN"} className="divide-y divide-zinc-200">ADMIN</option>
-                      <option value={"OWNER"} className="divide-y divide-zinc-200">OWNER</option>
-                      <option value={"VIEWER"} className="divide-y divide-zinc-200">VIEWER</option>
+                    value={role} onChange={(e)=> (setRole(e.target.value as Role))}>
+                      {availableRoles.map((option) => (
+                        <option key={option} value={option} className="divide-y divide-zinc-200">
+                          {option}
+                        </option>
+                      ))}
                     </select>
                   </Field>
               <Field>

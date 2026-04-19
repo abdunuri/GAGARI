@@ -102,7 +102,7 @@ export default function Home() {
             </article>
             <article className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold">Catalog Control</h3>
-              <p className="mt-2 text-sm text-zinc-600">Manage item names, categories, and pricing from one place.</p>
+              <p className="mt-2 text-sm text-zinc-600">Manage product names, categories, and pricing from one place.</p>
             </article>
             <article className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold">Role-Based Access</h3>
@@ -127,7 +127,7 @@ export default function Home() {
             <aside className="rounded-3xl border border-zinc-200 bg-zinc-900 p-6 text-zinc-100 shadow-sm">
               <p className="text-sm uppercase tracking-[0.14em] text-zinc-300">Trusted Workflow</p>
               <p className="mt-3 text-2xl font-semibold leading-tight">
-                One operational system for orders, items, and customers.
+                One operational system for orders, products, and customers.
               </p>
               <p className="mt-3 text-sm text-zinc-300">
                 GaGari gives your team consistent structure without heavy complexity.

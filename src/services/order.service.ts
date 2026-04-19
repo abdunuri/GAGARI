@@ -6,8 +6,8 @@ import { redirect } from "next/navigation";
 
 type createOrderInput = {
     customerId:number;
-    orderItems:{
-        itemId:number;
+    orderProducts:{
+        productId:number;
         unitPrice:number;
         quantity:number
     }[];
@@ -26,18 +26,18 @@ async function createOrder(orderinput:createOrderInput) {
             createdById:createdById,
             bakeryId:Number(bakeryId),
             customerId:orderinput.customerId,
-            orderItems:{
-                create:orderinput.orderItems.map(
-                    (item)=>({
-                        itemId :item.itemId,
-                        unitPrice:item.unitPrice,
-                        quantity:item.quantity
+            orderProducts:{
+                create:orderinput.orderProducts.map(
+                    (product)=>({
+                        productId :product.productId,
+                        unitPrice:product.unitPrice,
+                        quantity:product.quantity
                     })
                 ),
                 },
         },
         include:{
-            orderItems:true,
+            orderProducts:true,
             customer:true
         }
     });
@@ -55,15 +55,33 @@ async function getOrders(page = 1, pageSize = 20) {
     }
 
     const bakeryId = session.user.bakeryId;
+    const userId = session.user.id;
     const safePage = Math.max(1, page);
     const safePageSize = Math.max(1, pageSize);
-
+    if(session.user.role === "ADMIN"||session.user.role === "OWNER"){
+        const orders = await prisma.order.findMany({
+            where: {
+                bakeryId: Number(bakeryId),
+            },
+            include:{
+                orderProducts:true,
+                customer:true
+            },
+            orderBy: {
+                createdAt: "desc"
+            },
+            skip: (safePage - 1) * safePageSize,
+            take: safePageSize
+        })
+        return orders
+    }
     const orders = await prisma.order.findMany({
         where: {
-            bakeryId: Number(bakeryId)
+            bakeryId: Number(bakeryId),
+            createdById: userId
         },
         include:{
-            orderItems:true,
+            orderProducts:true,
             customer:true
         },
         orderBy: {

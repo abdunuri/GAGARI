@@ -1,19 +1,26 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { LoginForm } from "@/components/login-form"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { LayoutBottomIcon } from "@hugeicons/core-free-icons"
 import { authClient } from "@/lib/auth-client"
-import { redirect } from "next/navigation"
 
 export default function LoginPage() {
-  const lgocheck  = async function logdet(){
-    const session =  await authClient.getSession()
-    if(session){
-      redirect("/dashboard");
+  const router = useRouter()
+
+  useEffect(() => {
+    const lgocheck = async function logdet() {
+      const session = await authClient.getSession()
+      if (session) {
+        router.replace("/dashboard")
+      }
     }
-  }
-  lgocheck();
+
+    lgocheck()
+  }, [router])
+
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-[radial-gradient(circle_at_top,_#faf5f0_0%,_#ffffff_45%,_#f4f1eb_100%)] px-4 py-6 sm:px-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">

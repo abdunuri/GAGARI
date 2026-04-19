@@ -1,5 +1,4 @@
-import { CreateItem, GetItems } from "@/services/item.service";
-import { Message } from "@hugeicons/core-free-icons";
+import { CreateProduct, GetProducts } from "@/services/product.service";
 import { NextResponse } from "next/server";
 
 export async function POST(req:Request){
@@ -28,14 +27,14 @@ export async function POST(req:Request){
             );
         }
 
-        const item = await CreateItem({
+        const product = await CreateProduct({
             name: body.name.trim(),
             category: body.category.trim(),
             price: parsedPrice
         });
 
         return NextResponse.json(
-            {message:"item created successfully",item},
+            {message:"product created successfully",product},
             {status:201}
         );
     } catch (error) {
@@ -46,9 +45,9 @@ export async function POST(req:Request){
             );
         }
 
-        console.error("Failed to create item", error);
+        console.error("Failed to create product", error);
         return NextResponse.json(
-            { message: "Failed to create item." },
+            { message: "Failed to create product." },
             { status: 500 }
         );
     }
@@ -57,16 +56,16 @@ export async function POST(req:Request){
 
 export async function GET(){
     try {
-        const items = await GetItems()
+        const products = await GetProducts()
         return NextResponse.json(
-            { message: "items fetched successfully", items },
+            { message: "products fetched successfully", products },
             { status: 200 }
         )
     } catch (e) {
-        console.error("Failed to fetch items", e)
+        console.error("Failed to fetch products", e)
         const errorMessage = e instanceof Error ? e.message : "unknown"
         return NextResponse.json(
-            { message: "failed to fetch items", error: errorMessage },
+            { message: "failed to fetch products", error: errorMessage },
             { status: 500 }
         )
     }

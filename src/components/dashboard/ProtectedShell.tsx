@@ -3,7 +3,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import SignOutButton from "@/components/dashboard/SignOutButton";
+import { GetBakeryById } from "@/services/bakery.service";
 
+type Bakery = Awaited<ReturnType<typeof GetBakeryById>>;
 export default async function ProtectedShell({
   children,
 }: {
@@ -24,7 +26,7 @@ export default async function ProtectedShell({
           <div className="flex items-start justify-between gap-3 lg:items-center lg:justify-start">
             <div className="space-y-1">
               <Link href="/" className="text-xl font-semibold tracking-tight sm:text-2xl lg:text-xl">
-                GaGari
+                {await GetBakeryById(Number(session.user.bakeryId))?.then((bakery: Bakery) => bakery?.name) || "Bakery Dashboard"} Bakery
               </Link>
               <p className="max-w-sm text-xs text-zinc-500 sm:text-sm lg:max-w-none lg:text-xs">
                 Bakery operations built for mobile-first teams.
@@ -50,10 +52,10 @@ export default async function ProtectedShell({
               Customers
             </Link>
             <Link
-              href="/items"
+              href="/products"
               className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-900 hover:text-white lg:px-4 lg:py-1.5"
             >
-              Items
+              Products
             </Link>
             <Link
               href="/orders"

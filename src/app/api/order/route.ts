@@ -6,8 +6,8 @@ export async function POST(req:Request) {
         const body = await req.json();
         if(
             !body.customerId||
-            !Array.isArray(body.orderItems)||
-            body.orderItems.length===0
+            !Array.isArray(body.orderProducts)||
+            body.orderProducts.length===0
         ){
             return NextResponse.json(
                 {message:"Missing required fields"},
@@ -15,26 +15,26 @@ export async function POST(req:Request) {
             );
         }
 
-        const invalidItem = body.orderItems.some(
-            (item: any) =>
-                !item.itemId ||
-                typeof item.unitPrice !== "number" ||
-                item.unitPrice < 0 ||
-                typeof item.quantity !== "number" ||
-                item.quantity <= 0
+        const invalidProduct = body.orderProducts.some(
+            (product: any) =>
+                !product.productId ||
+                typeof product.unitPrice !== "number" ||
+                product.unitPrice < 0 ||
+                typeof product.quantity !== "number" ||
+                product.quantity <= 0
         );
-        if (invalidItem) {
+        if (invalidProduct) {
             return NextResponse.json(
-                { message: "Invalid order item data" },
+                { message: "Invalid order product data" },
                 { status: 400 }
             );
         }
         const order = await createOrder({
             customerId:body.customerId,
-            orderItems:body.orderItems.map((item:any)=>({
-                itemId:item.itemId,
-                unitPrice:item.unitPrice,
-                quantity:item.quantity
+            orderProducts:body.orderProducts.map((product:any)=>({
+                productId:product.productId,
+                unitPrice:product.unitPrice,
+                quantity:product.quantity
             }))
         })
 
