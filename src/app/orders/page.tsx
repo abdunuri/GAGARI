@@ -46,7 +46,7 @@ export default async function OrdersPage(){
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
-          <div className="hidden grid-cols-3 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold md:grid">
+          <div className="grid-cols-3 gap-1 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold grid">
             <span>Customer</span>
             <span>Total</span>
             <span>Status</span>

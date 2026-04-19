@@ -144,7 +144,7 @@ export default function CustomerPage() {
           </div>
 
           <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
-            <div className="hidden grid-cols-2 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold md:grid">
+            <div className="grid-cols-2 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold grid">
               <span>Customer Name</span>
               <span>Phone Number</span>
             </div>
