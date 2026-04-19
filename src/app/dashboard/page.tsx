@@ -47,9 +47,14 @@ const roleCopy = {
 } as const;
 
 export default async function Dashboard(){
-    const session = await auth.api.getSession({
-        headers:await headers()
-    })
+    let session = null
+    try {
+        session = await auth.api.getSession({
+            headers:await headers()
+        })
+    } catch {
+        session = null
+    }
 
     if(!session){
         redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
