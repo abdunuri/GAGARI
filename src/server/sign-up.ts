@@ -1,4 +1,5 @@
 import { authClient } from "@/lib/auth-client";
+import { getAuthErrorMessage } from "@/lib/auth-error-message";
 
 type SignUpData = {
     email:string,
@@ -32,10 +33,12 @@ export async function SignUp(signupdata:SignUpData){
             bakeryId: ""
         });
 
+        if (response?.error) {
+            throw new Error(getAuthErrorMessage(response.error, "signup"));
+        }
+
         return response;
     } catch (error) {
-        console.error("SignUp failed", error);
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`SignUp failed: ${message}`, { cause: error });
+        throw new Error(getAuthErrorMessage(error, "signup"), { cause: error });
     }
 }

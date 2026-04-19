@@ -12,11 +12,12 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { SignUp } from "@/server/sign-up"
 
 type CurrentUserRole = "ADMIN" | "OWNER"
@@ -41,6 +42,19 @@ export function SignupForm({
   const [username,setUsername] = useState("")
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (!success) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setSuccess("");
+    }, 4000);
+
+    return () => window.clearTimeout(timeout);
+  }, [success]);
 
 
   return (
@@ -56,6 +70,7 @@ export function SignupForm({
           <form onSubmit={async (e) =>{
             e.preventDefault();
             setError("");
+            setSuccess("");
 
             if (confirmPassword !== password) {
               setError("Passwords do not match.");
@@ -72,6 +87,7 @@ export function SignupForm({
                 name:name,
                 currentUserRole,
               });
+              setSuccess("Account created successfully. Redirecting to dashboard...");
             } catch (err) {
               const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";
               setError(message);
@@ -137,8 +153,16 @@ export function SignupForm({
                   {loading ? "Creating Account..." : "Create Account"}
                 </Button>
                 {error ? (
-                  <FieldDescription className="pt-2 text-center text-red-600">
+                  <FieldError className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-red-700">
                     {error}
+                  </FieldError>
+                ) : null}
+                {success ? (
+                  <FieldDescription
+                    role="status"
+                    className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-emerald-700"
+                  >
+                    {success}
                   </FieldDescription>
                 ) : null}
                 <FieldDescription className="text-center">
