@@ -78,7 +78,7 @@ export default function OrderRow({customerName,total,status,isBulk=false,childOr
                 </summary>
                 <div className="border-t border-zinc-200 bg-zinc-50 px-6 py-3">
                     <div className="space-y-3">
-                        {childOrders[0]?.items.map((item) => (
+                        {childOrders[0]?.items?.map((item) => (
                             <div key={item.id} className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>

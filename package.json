@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:status:supabase": "node scripts/prisma-supabase-guard.mjs status",
+    "db:migrate:supabase": "node scripts/prisma-supabase-guard.mjs deploy",
     "postinstall": "prisma generate"
   },
   "dependencies": {
