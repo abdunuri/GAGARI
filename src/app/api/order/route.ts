@@ -31,6 +31,7 @@ export async function POST(req:Request) {
         }
         const order = await createOrder({
             customerId:body.customerId,
+            bulkBatchId: typeof body.bulkBatchId === "string" ? body.bulkBatchId : undefined,
             orderProducts:body.orderProducts.map((product:any)=>({
                 productId:product.productId,
                 unitPrice:product.unitPrice,

@@ -1,17 +1,38 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { OrderStatus, Prisma } from "@prisma/client";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 
 type createOrderInput = {
     customerId:number;
+    bulkBatchId?: string;
     orderProducts:{
         productId:number;
         unitPrice:number;
         quantity:number
     }[];
 };
+
+type OrderListItem = {
+    id: string;
+    bulkBatchId: string | null;
+    status: OrderStatus;
+    customer: {
+        id: number;
+        name: string;
+    };
+    orderProducts: {
+        unitPrice: Prisma.Decimal;
+        quantity: number;
+        product: {
+            id: number;
+            name: string;
+        };
+    }[];
+};
+
 async function createOrder(orderinput:createOrderInput) {
     const session = await auth.api.getSession({
         headers:await headers()
@@ -26,6 +47,7 @@ async function createOrder(orderinput:createOrderInput) {
             createdById:createdById,
             bakeryId:Number(bakeryId),
             customerId:orderinput.customerId,
+            bulkBatchId: orderinput.bulkBatchId,
             orderProducts:{
                 create:orderinput.orderProducts.map(
                     (product)=>({
@@ -45,7 +67,7 @@ async function createOrder(orderinput:createOrderInput) {
     
 };
 
-async function getOrders(page = 1, pageSize = 20) {
+async function getOrders(page = 1, pageSize = 20): Promise<OrderListItem[]> {
     const session = await auth.api.getSession({
         headers: await headers()
     })
@@ -63,9 +85,28 @@ async function getOrders(page = 1, pageSize = 20) {
             where: {
                 bakeryId: Number(bakeryId),
             },
-            include:{
-                orderProducts:true,
-                customer:true
+            select: {
+                id: true,
+                bulkBatchId: true,
+                status: true,
+                customer: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                orderProducts: {
+                    select: {
+                        unitPrice: true,
+                        quantity: true,
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
                 createdAt: "desc"
@@ -80,9 +121,28 @@ async function getOrders(page = 1, pageSize = 20) {
             bakeryId: Number(bakeryId),
             createdById: userId
         },
-        include:{
-            orderProducts:true,
-            customer:true
+        select: {
+            id: true,
+            bulkBatchId: true,
+            status: true,
+            customer: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            orderProducts: {
+                select: {
+                    unitPrice: true,
+                    quantity: true,
+                    product: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            },
         },
         orderBy: {
             createdAt: "desc"

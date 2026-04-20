@@ -5,6 +5,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type OrderProductInput = {
   productId: number;
   unitPrice: number;
+  quantity: string;
+};
+
+type OrderProductPayload = {
+  productId: number;
+  unitPrice: number;
   quantity: number;
 };
 
@@ -16,7 +22,7 @@ type Customer = {
 
 type Order = {
   customer: Customer;
-  orderProducts: OrderProductInput[];
+  orderProducts: OrderProductPayload[];
 };
 
 type NewOrderResponse = {
@@ -70,11 +76,11 @@ export default function NewOrderPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState("1");
   const [orderProducts, setOrderProducts] = useState<OrderProductInput[]>([
-    { productId: 0, unitPrice: 0, quantity: 1 },
+    { productId: 0, unitPrice: 0, quantity: "" },
   ]);
-  const [bulkQuantities, setBulkQuantities] = useState<Record<number, number>>({});
+  const [bulkQuantities, setBulkQuantities] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [draftInfo, setDraftInfo] = useState<{ savedAt: number; restored: boolean } | null>(null);
@@ -92,7 +98,7 @@ export default function NewOrderPage() {
           const next = { ...current };
           for (const customer of data.customers) {
             if (next[customer.id] === undefined) {
-              next[customer.id] = 0;
+              next[customer.id] = "";
             }
           }
           return next;
@@ -133,13 +139,18 @@ export default function NewOrderPage() {
 
   const selectedBreadPrice = Number(selectedBreadProduct?.price ?? 0);
 
-  const singleOrderTotal = orderProducts.reduce(
-    (sum, product) => sum + Number(product.unitPrice) * Number(product.quantity),
-    0
-  );
+  const toSafeNumber = (value: string) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const singleOrderTotal = orderProducts.reduce((sum, product) => {
+    const quantity = toSafeNumber(product.quantity);
+    return sum + Number(product.unitPrice) * quantity;
+  }, 0);
 
   const bulkRows = customers.map((customer) => {
-    const quantity = bulkQuantities[customer.id] ?? 0;
+    const quantity = toSafeNumber(bulkQuantities[customer.id] ?? "");
     return {
       customer,
       quantity,
@@ -184,9 +195,10 @@ export default function NewOrderPage() {
         return;
       }
 
-      const restoredQuantities: Record<number, number> = {};
+      const restoredQuantities: Record<number, string> = {};
       for (const order of parsed.orders ?? []) {
-        restoredQuantities[order.customerId] = Number(order.products?.[0]?.quantity ?? 0);
+        const restoredQuantity = Number(order.products?.[0]?.quantity ?? 0);
+        restoredQuantities[order.customerId] = restoredQuantity > 0 ? String(restoredQuantity) : "";
       }
 
       if (parsed.selectedProductId) {
@@ -211,7 +223,7 @@ export default function NewOrderPage() {
 
     const rowsToStore = customers
       .map((customer) => {
-        const quantity = bulkQuantities[customer.id] ?? 0;
+        const quantity = toSafeNumber(bulkQuantities[customer.id] ?? "");
         return {
           customer,
           quantity,
@@ -250,10 +262,10 @@ export default function NewOrderPage() {
     }));
   }, [activeMode, bulkQuantities, customers, selectedBreadPrice, selectedProductId]);
 
-  const handleProductChange = (
+  const handleProductChange = <K extends keyof OrderProductInput>(
     index: number,
-    field: keyof OrderProductInput,
-    value: number
+    field: K,
+    value: OrderProductInput[K]
   ) => {
     const updated = [...orderProducts];
     updated[index][field] = value;
@@ -263,7 +275,7 @@ export default function NewOrderPage() {
   const addProduct = () => {
     setOrderProducts((current) => [
       ...current,
-      { productId: 0, unitPrice: 0, quantity: 1 },
+      { productId: 0, unitPrice: 0, quantity: "" },
     ]);
   };
 
@@ -277,6 +289,16 @@ export default function NewOrderPage() {
     setMessage("");
 
     try {
+      const normalizedOrderProducts: OrderProductPayload[] = orderProducts.map((product) => ({
+        productId: product.productId,
+        unitPrice: product.unitPrice,
+        quantity: toSafeNumber(product.quantity),
+      }));
+
+      if (normalizedOrderProducts.some((product) => product.quantity <= 0)) {
+        throw new Error("Please enter quantity greater than 0 for all products");
+      }
+
       const res = await fetch("/api/order", {
         method: "POST",
         headers: {
@@ -284,7 +306,7 @@ export default function NewOrderPage() {
         },
         body: JSON.stringify({
           customerId: Number(customerId),
-          orderProducts,
+          orderProducts: normalizedOrderProducts,
         }),
       });
 
@@ -296,7 +318,7 @@ export default function NewOrderPage() {
 
       setMessage("Order created successfully");
       setCustomerId("");
-      setOrderProducts([{ productId: 0, unitPrice: 0, quantity: 1 }]);
+      setOrderProducts([{ productId: 0, unitPrice: 0, quantity: "" }]);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to create order");
@@ -316,6 +338,7 @@ export default function NewOrderPage() {
       }
 
       const rowsToSubmit = bulkRows.filter((row) => row.quantity > 0);
+      const bulkBatchId = crypto.randomUUID();
 
       if (rowsToSubmit.length === 0) {
         throw new Error("Enter at least one customer quantity");
@@ -329,6 +352,7 @@ export default function NewOrderPage() {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
+              bulkBatchId,
               customerId: row.customer.id,
               orderProducts: [
                 {
@@ -354,7 +378,7 @@ export default function NewOrderPage() {
       setBulkQuantities((current) => {
         const next = { ...current };
         for (const customer of customers) {
-          next[customer.id] = 0;
+          next[customer.id] = "";
         }
         return next;
       });
@@ -460,10 +484,10 @@ export default function NewOrderPage() {
                     </select>
                     <input
                       type="number"
-                      placeholder="Quantity"
+                      placeholder="Enter quantity"
                       value={product.quantity}
                       onChange={(e) =>
-                        handleProductChange(index, "quantity", Number(e.target.value))
+                        handleProductChange(index, "quantity", e.target.value)
                       }
                       className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                       required
@@ -555,7 +579,7 @@ export default function NewOrderPage() {
                 </div>
               )}
 
-              <div>
+              <div hidden>
                 <label className="mb-1 block text-sm font-medium text-zinc-800">Bread Product</label>
                 <select
                   value={selectedProductId}
@@ -602,7 +626,7 @@ export default function NewOrderPage() {
                           }}
                           type="number"
                           min={0}
-                          value={bulkQuantities[row.customer.id] ?? 0}
+                          value={bulkQuantities[row.customer.id] ?? ""}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
@@ -616,11 +640,11 @@ export default function NewOrderPage() {
                           onChange={(e) =>
                             setBulkQuantities((current) => ({
                               ...current,
-                              [row.customer.id]: Number(e.target.value),
+                              [row.customer.id]: e.target.value,
                             }))
                           }
                           className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm md:rounded-2xl md:px-4 md:py-3"
-                          placeholder="0"
+                          placeholder="Enter quantity"
                         />
                       </div>
                     </div>

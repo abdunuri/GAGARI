@@ -155,6 +155,8 @@ model Product {
 model Order {
   id String @id @default(cuid())
 
+  bulkBatchId String?
+
   bakeryId Int
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
