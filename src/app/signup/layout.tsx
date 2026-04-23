@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -7,6 +8,12 @@ export default async function SignupLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const userCount = await prisma.user.count();
+
+  if (userCount === 0) {
+    return <>{children}</>;
+  }
+
   const session = await auth.api.getSession({
     headers: await headers(),
   });

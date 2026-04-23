@@ -20,10 +20,11 @@ import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
 import { SignUp } from "@/server/sign-up"
 
-type CurrentUserRole = "ADMIN" | "OWNER"
+type SignupContext = "BOOTSTRAP" | "ADMIN" | "OWNER"
 type Role = "ADMIN" | "OWNER" | "STAFF" | "VIEWER"
 
-const ROLE_OPTIONS: Record<CurrentUserRole, Role[]> = {
+const ROLE_OPTIONS: Record<SignupContext, Role[]> = {
+  BOOTSTRAP: ["ADMIN"],
   ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
   OWNER: ["STAFF", "VIEWER"],
 }
@@ -32,7 +33,7 @@ export function SignupForm({
   className,
   currentUserRole,
   ...props
-}: React.ComponentProps<"div"> & { currentUserRole: CurrentUserRole }) {
+}: React.ComponentProps<"div"> & { currentUserRole: SignupContext }) {
   const availableRoles = ROLE_OPTIONS[currentUserRole]
   const [email,setEmail] = useState("");
   const [name,setName] = useState("")
@@ -128,6 +129,11 @@ export function SignupForm({
                       ))}
                     </select>
                   </Field>
+                {currentUserRole === "BOOTSTRAP" ? (
+                  <FieldDescription className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                    This is the first account in a new database. It will be created as an ADMIN.
+                  </FieldDescription>
+                ) : null}
               <Field>
                 <Field className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field>
