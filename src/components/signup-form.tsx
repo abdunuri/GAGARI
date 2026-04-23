@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
-import { SignUp } from "@/server/sign-up"
 
 type SignupContext = "BOOTSTRAP" | "ADMIN" | "OWNER"
 type Role = "ADMIN" | "OWNER" | "STAFF" | "VIEWER"
@@ -80,14 +79,26 @@ export function SignupForm({
 
             try {
               setLoading(true);
-              await SignUp({
+              const response = await fetch("/api/signup", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
                 email:email,
                 password:password,
                 role:role,
                 username:username,
                 name:name,
                 currentUserRole,
+                }),
               });
+
+              const result = (await response.json()) as { message?: string };
+              if (!response.ok) {
+                throw new Error(result.message ?? "Sign up failed. Please try again.");
+              }
+
               setSuccess("Account created successfully. Redirecting to dashboard...");
             } catch (err) {
               const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";

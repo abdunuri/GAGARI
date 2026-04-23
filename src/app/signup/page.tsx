@@ -7,6 +7,8 @@ import { headers } from "next/headers"
 
 type SignupContext = "BOOTSTRAP" | "ADMIN" | "OWNER"
 
+export const dynamic = "force-dynamic"
+
 export default async function SignupPage() {
   const userCount = await prisma.user.count()
   const session = await auth.api.getSession({
