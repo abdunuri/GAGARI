@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public", "production"]
 }
 
 enum Role {
@@ -12,18 +13,24 @@ enum Role {
   OWNER
   STAFF
   VIEWER
+
+  @@schema("production")
 }
 
 enum Category {
   BREAD
   FASTF
   CAKE
+
+  @@schema("production")
 }
 
 enum OrderStatus {
   PENDING
   PAID
   CANCELLED
+
+  @@schema("production")
 }
 
 model User {
@@ -49,6 +56,7 @@ model User {
   createdProducts  Product[]  @relation("ProductCreatedBy")
 
   @@map("user")
+  @@schema("production")
 }
 
 model Session {
@@ -65,6 +73,7 @@ model Session {
   @@unique([token])
   @@index([userId])
   @@map("session")
+  @@schema("production")
 }
 
 model Account {
@@ -85,6 +94,7 @@ model Account {
 
   @@index([userId])
   @@map("account")
+  @@schema("production")
 }
 
 model Verification {
@@ -97,6 +107,7 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+  @@schema("production")
 }
 
 
@@ -114,6 +125,8 @@ model Bakery {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("production")
 }
 
 model Customer {
@@ -132,6 +145,8 @@ model Customer {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("production")
 }
 
 model Product {
@@ -150,6 +165,8 @@ model Product {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("production")
 }
 
 model Order {
@@ -171,6 +188,8 @@ model Order {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("production")
 }
 
 model OrderProduct {
@@ -190,4 +209,5 @@ model OrderProduct {
   updatedAt DateTime @updatedAt
 
   @@unique([productId, orderId])
+  @@schema("production")
 }
