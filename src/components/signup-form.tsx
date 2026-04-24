@@ -31,8 +31,9 @@ const ROLE_OPTIONS: Record<SignupContext, Role[]> = {
 export function SignupForm({
   className,
   currentUserRole,
+  currentBakeryId,
   ...props
-}: React.ComponentProps<"div"> & { currentUserRole: SignupContext }) {
+}: React.ComponentProps<"div"> & { currentUserRole: SignupContext; currentBakeryId: number | null }) {
   const availableRoles = ROLE_OPTIONS[currentUserRole]
   const [email,setEmail] = useState("");
   const [name,setName] = useState("")
@@ -40,9 +41,16 @@ export function SignupForm({
   const [confirmPassword,setConfirmPassword] = useState("");
   const [role,setRole] = useState<Role>(availableRoles[0]);
   const [username,setUsername] = useState("")
+  const [bakeryId, setBakeryId] = useState("")
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (currentUserRole === "ADMIN") {
+      setBakeryId("")
+    }
+  }, [currentUserRole])
 
   useEffect(() => {
     if (!success) {
@@ -77,6 +85,26 @@ export function SignupForm({
               return;
             }
 
+            const parsedBakeryId = Number.parseInt(bakeryId.trim(), 10);
+            const resolvedBakeryId =
+              currentUserRole === "OWNER"
+                ? currentBakeryId
+                : currentUserRole === "BOOTSTRAP"
+                  ? null
+                  : Number.isInteger(parsedBakeryId) && parsedBakeryId > 0
+                    ? parsedBakeryId
+                    : null;
+
+            if (currentUserRole === "ADMIN" && resolvedBakeryId === null) {
+              setError("Bakery ID is required for admin-created users.");
+              return;
+            }
+
+            if (currentUserRole === "OWNER" && resolvedBakeryId === null) {
+              setError("Your bakery ID could not be determined. Please contact an administrator.");
+              return;
+            }
+
             try {
               setLoading(true);
               const response = await fetch("/api/signup", {
@@ -91,6 +119,7 @@ export function SignupForm({
                 username:username,
                 name:name,
                 currentUserRole,
+                bakeryId: resolvedBakeryId ?? undefined,
                 }),
               });
 
@@ -140,6 +169,22 @@ export function SignupForm({
                       ))}
                     </select>
                   </Field>
+                  {currentUserRole === "ADMIN" ? (
+                    <Field>
+                      <FieldLabel htmlFor="bakeryId">Bakery ID</FieldLabel>
+                      <Input
+                        id="bakeryId"
+                        type="number"
+                        placeholder="1"
+                        required
+                        value={bakeryId}
+                        onChange={(e) => setBakeryId(e.target.value)}
+                      />
+                      <FieldDescription>
+                        Use the bakery ID for the owner or staff account you are creating.
+                      </FieldDescription>
+                    </Field>
+                  ) : null}
                 {currentUserRole === "BOOTSTRAP" ? (
                   <FieldDescription className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
                     This is the first account in a new database. It will be created as an ADMIN.

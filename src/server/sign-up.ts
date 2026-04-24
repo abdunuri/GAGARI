@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/prisma";
 import { authClient } from "@/lib/auth-client";
 import { getAuthErrorMessage } from "@/lib/auth-error-message";
 
@@ -8,40 +7,31 @@ type SignUpData = {
     name:string,
     role:"ADMIN" | "OWNER" | "STAFF" | "VIEWER",
     username:string,
-    currentUserRole:"BOOTSTRAP" | "ADMIN" | "OWNER"
+    currentUserRole:"ADMIN" | "OWNER",
+    bakeryId?: number
 }
 
 const ROLE_OPTIONS = {
-    BOOTSTRAP: ["ADMIN"],
     ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
     OWNER: ["STAFF", "VIEWER"],
 } as const
 
 export async function SignUp(signupdata:SignUpData){
     try {
-        const userCount = await prisma.user.count();
-        if (signupdata.currentUserRole === "BOOTSTRAP") {
-            if (userCount > 0) {
-                throw new Error("Bootstrap signup is only available when the database is empty.");
-            }
-        }
-
         const allowedRoles = ROLE_OPTIONS[signupdata.currentUserRole] as readonly SignUpData["role"][]
 
         if (!allowedRoles.includes(signupdata.role)) {
             throw new Error(`Role ${signupdata.role} is not allowed for ${signupdata.currentUserRole.toLowerCase()}`)
         }
 
-        const role = signupdata.currentUserRole === "BOOTSTRAP" ? "ADMIN" : signupdata.role;
-
         const response = await authClient.signUp.email({
             email: signupdata.email,
             password: signupdata.password,
             name: signupdata.name,
             username: signupdata.username,
-            role,
+            role: signupdata.role,
             callbackURL: "/dashboard",
-            bakeryId: ""
+            ...(signupdata.bakeryId !== undefined ? { bakeryId: signupdata.bakeryId } : {}),
         });
 
         if (response?.error) {

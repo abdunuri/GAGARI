@@ -14,6 +14,7 @@ export default async function SignupPage() {
   const session = await auth.api.getSession({
     headers: await headers(),
   })
+  const currentBakeryId = session?.user.bakeryId ?? null
 
   const currentUserRole: SignupContext = userCount === 0 ? "BOOTSTRAP" : session?.user.role === "ADMIN" ? "ADMIN" : "OWNER"
 
@@ -26,7 +27,7 @@ export default async function SignupPage() {
           </div>
           GaGari Plc
         </a>
-        <SignupForm currentUserRole={currentUserRole} />
+        <SignupForm currentUserRole={currentUserRole} currentBakeryId={currentBakeryId} />
       </div>
     </div>
   )
