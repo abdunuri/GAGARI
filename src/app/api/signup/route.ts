@@ -3,8 +3,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAuthErrorMessage } from "@/lib/auth-error-message";
 
-type SignupContext = "BOOTSTRAP" | "ADMIN" | "OWNER";
-type Role = "ADMIN" | "OWNER" | "STAFF" | "VIEWER";
+type SignupContext = "BOOTSTRAP" | "SYSTEM_ADMIN" | "OWNER";
+type Role = "SYSTEM_ADMIN" | "ADMIN" | "OWNER" | "STAFF" | "VIEWER";
 
 type SignUpBody = {
   email: string;
@@ -17,8 +17,8 @@ type SignUpBody = {
 };
 
 const ROLE_OPTIONS: Record<SignupContext, Role[]> = {
-  BOOTSTRAP: ["ADMIN"],
-  ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
+  BOOTSTRAP: ["SYSTEM_ADMIN"],
+  SYSTEM_ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
   OWNER: ["STAFF", "VIEWER"],
 };
 
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const selectedRole = currentUserRole === "BOOTSTRAP" ? "ADMIN" : role;
+    const selectedRole = currentUserRole === "BOOTSTRAP" ? "SYSTEM_ADMIN" : role;
 
     const response = await auth.api.signUpEmail({
       body: {

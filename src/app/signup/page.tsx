@@ -5,7 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { LayoutBottomIcon } from "@hugeicons/core-free-icons"
 import { headers } from "next/headers"
 
-type SignupContext = "BOOTSTRAP" | "ADMIN" | "OWNER"
+type SignupContext = "BOOTSTRAP" | "SYSTEM_ADMIN" | "OWNER"
 
 export const dynamic = "force-dynamic"
 
@@ -16,7 +16,8 @@ export default async function SignupPage() {
   })
   const currentBakeryId = session?.user.bakeryId ?? null
 
-  const currentUserRole: SignupContext = userCount === 0 ? "BOOTSTRAP" : session?.user.role === "ADMIN" ? "ADMIN" : "OWNER"
+  const currentUserRole: SignupContext =
+    userCount === 0 ? "BOOTSTRAP" : session?.user.role === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "OWNER"
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-[radial-gradient(circle_at_top,_#faf5f0_0%,_#ffffff_45%,_#f4f1eb_100%)] px-4 py-6 sm:px-6 md:p-10">

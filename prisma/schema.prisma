@@ -9,6 +9,7 @@ datasource db {
 }
 
 enum Role {
+  SYSTEM_ADMIN
   ADMIN
   OWNER
   STAFF
@@ -115,8 +116,8 @@ model Bakery {
   id   Int    @id @default(autoincrement())
   name String
 
-  ownerId String  @unique
-  owner   User @relation("BakeryOwner", fields: [ownerId], references: [id])
+  ownerId String? @unique
+  owner   User? @relation("BakeryOwner", fields: [ownerId], references: [id])
 
   members   User[]     @relation("BakeryMembers")
   customers Customer[]

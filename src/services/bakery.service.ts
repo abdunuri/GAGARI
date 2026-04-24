@@ -13,8 +13,8 @@ async function createBakery(newBakeryInfo:newBakeryInfo){
     const session = await auth.api.getSession({
         headers:await headers()
     });
-    if(!session || session.user.role !== "ADMIN"){
-        console.log("login required (admin only)")
+    if(!session || session.user.role !== "SYSTEM_ADMIN"){
+        console.log("login required (system admin only)")
         redirect(`${process.env["BETTER_AUTH_URL"] ?? ""}/login`)    }
 
     const bakery = await prisma.bakery.create({
@@ -31,8 +31,8 @@ async function GetBakery(){
     const session = await auth.api.getSession({
         headers:await headers()
     });
-    if(!session || session.user.role !== "ADMIN"){
-        console.log("login required (admin only)")
+    if(!session || session.user.role !== "SYSTEM_ADMIN"){
+        console.log("login required (system admin only)")
         redirect(`${process.env["BETTER_AUTH_URL"] ?? ""}/login`)    }
 
     const bakery = await prisma.bakery.findMany();

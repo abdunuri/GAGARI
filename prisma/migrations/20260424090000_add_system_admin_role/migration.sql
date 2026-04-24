@@ -1,0 +1,1 @@
+ALTER TYPE "production"."Role" ADD VALUE IF NOT EXISTS 'SYSTEM_ADMIN';

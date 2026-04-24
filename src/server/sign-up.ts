@@ -5,14 +5,14 @@ type SignUpData = {
     email:string,
     password:string,
     name:string,
-    role:"ADMIN" | "OWNER" | "STAFF" | "VIEWER",
+    role:"SYSTEM_ADMIN" | "ADMIN" | "OWNER" | "STAFF" | "VIEWER",
     username:string,
-    currentUserRole:"ADMIN" | "OWNER",
+    currentUserRole:"SYSTEM_ADMIN" | "OWNER",
     bakeryId?: number
 }
 
 const ROLE_OPTIONS = {
-    ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
+    SYSTEM_ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
     OWNER: ["STAFF", "VIEWER"],
 } as const
 

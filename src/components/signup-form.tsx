@@ -19,12 +19,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
 
-type SignupContext = "BOOTSTRAP" | "ADMIN" | "OWNER"
-type Role = "ADMIN" | "OWNER" | "STAFF" | "VIEWER"
+type SignupContext = "BOOTSTRAP" | "SYSTEM_ADMIN" | "OWNER"
+type Role = "SYSTEM_ADMIN" | "ADMIN" | "OWNER" | "STAFF" | "VIEWER"
 
 const ROLE_OPTIONS: Record<SignupContext, Role[]> = {
-  BOOTSTRAP: ["ADMIN"],
-  ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
+  BOOTSTRAP: ["SYSTEM_ADMIN"],
+  SYSTEM_ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
   OWNER: ["STAFF", "VIEWER"],
 }
 
@@ -47,7 +47,7 @@ export function SignupForm({
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    if (currentUserRole === "ADMIN") {
+    if (currentUserRole === "SYSTEM_ADMIN") {
       setBakeryId("")
     }
   }, [currentUserRole])
@@ -95,8 +95,8 @@ export function SignupForm({
                     ? parsedBakeryId
                     : null;
 
-            if (currentUserRole === "ADMIN" && resolvedBakeryId === null) {
-              setError("Bakery ID is required for admin-created users.");
+            if (currentUserRole === "SYSTEM_ADMIN" && resolvedBakeryId === null) {
+              setError("Bakery ID is required when system admin creates bakery users.");
               return;
             }
 
@@ -169,7 +169,7 @@ export function SignupForm({
                       ))}
                     </select>
                   </Field>
-                  {currentUserRole === "ADMIN" ? (
+                  {currentUserRole === "SYSTEM_ADMIN" ? (
                     <Field>
                       <FieldLabel htmlFor="bakeryId">Bakery ID</FieldLabel>
                       <Input
@@ -187,7 +187,7 @@ export function SignupForm({
                   ) : null}
                 {currentUserRole === "BOOTSTRAP" ? (
                   <FieldDescription className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
-                    This is the first account in a new database. It will be created as an ADMIN.
+                    This is the first account in a new database. It will be created as a SYSTEM_ADMIN.
                   </FieldDescription>
                 ) : null}
               <Field>

@@ -7,7 +7,7 @@ if (process.env["NODE_ENV"] !== "production") {
   loadEnv({ path: ".env.local", override: true, quiet: true });
 }
 
-const databaseUrl = process.env["SUPABASE_DATABASE_URL"] ?? process.env["DATABASE_URL"] ?? process.env["DIRECT_URL"];
+const databaseUrl = process.env["DIRECT_URL"] ?? process.env["SUPABASE_DATABASE_URL"] ?? process.env["DATABASE_URL"];
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

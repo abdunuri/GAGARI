@@ -4,6 +4,16 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
 const roleCopy = {
+    SYSTEM_ADMIN: {
+        title: "System Admin Dashboard",
+        description: "Manage platform-wide settings, bakeries, and privileged accounts.",
+        accent: "from-violet-500 to-indigo-600",
+        actions: [
+            { label: "Manage customers", href: "/customers" },
+            { label: "Review orders", href: "/orders" },
+            { label: "Add products", href: "/products" },
+        ],
+    },
     ADMIN: {
         title: "Admin Dashboard",
         description: "Oversee the bakery, manage staff workflows, and monitor activity.",
@@ -59,12 +69,16 @@ export default async function Dashboard(){
     if(!session){
         redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
     }
+    const role = session.user.role as keyof typeof roleCopy;
+    if (role === "SYSTEM_ADMIN") {
+        redirect("/Admin");
+    }
+
     const bakeryId = Number(session.user.bakeryId);
     if (Number.isNaN(bakeryId)) {
         throw new Error("Invalid bakeryId in session");
     }
 
-    const role = session.user.role as keyof typeof roleCopy;
     const dashboard = roleCopy[role] ?? roleCopy.STAFF;
     const showStats = role === "ADMIN" || role === "OWNER";
     let recentOrders =  await prisma.order.findMany({
@@ -75,12 +89,12 @@ export default async function Dashboard(){
         })
     const [customerCount, productCount, orderCount, pendingCount] = await Promise.all([
         prisma.customer.count({ where: { bakeryId } }),
-        (prisma as any).product.count({ where: { bakeryId } }),
+        prisma.product.count({ where: { bakeryId } }),
         prisma.order.count({ where: { bakeryId } }),
         prisma.order.count({ where: { bakeryId, status: "PENDING" } }),
     ]);
 
-    if(session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
+    if(session.user.role !== "SYSTEM_ADMIN" && session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
         recentOrders = recentOrders.filter(order => order.createdById === session.user.id);
     }
         

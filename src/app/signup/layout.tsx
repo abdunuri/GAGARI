@@ -24,7 +24,7 @@ export default async function SignupLayout({
     redirect("/login");
   }
 
-  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
+  if (session.user.role !== "SYSTEM_ADMIN" && session.user.role !== "OWNER") {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-[radial-gradient(circle_at_top,_#faf5f0_0%,_#ffffff_45%,_#f4f1eb_100%)] px-4 py-6 sm:px-6 md:p-10">
         <div className="flex w-full max-w-sm flex-col gap-6">
