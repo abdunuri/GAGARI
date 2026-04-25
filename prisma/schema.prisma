@@ -5,25 +5,33 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public", "production"]
 }
 
 enum Role {
+  SYSTEM_ADMIN
   ADMIN
   OWNER
   STAFF
   VIEWER
+
+  @@schema("production")
 }
 
 enum Category {
   BREAD
   FASTF
   CAKE
+
+  @@schema("production")
 }
 
 enum OrderStatus {
   PENDING
   PAID
   CANCELLED
+
+  @@schema("production")
 }
 
 model User {
@@ -46,9 +54,10 @@ model User {
 
   createdCustomers Customer[] @relation("CustomerCreatedBy")
   createdOrders    Order[]    @relation("OrderCreatedBy")
-  createdItems     Item[]     @relation("ItemCreatedBy")
+  createdProducts  Product[]  @relation("ProductCreatedBy")
 
   @@map("user")
+  @@schema("production")
 }
 
 model Session {
@@ -65,6 +74,7 @@ model Session {
   @@unique([token])
   @@index([userId])
   @@map("session")
+  @@schema("production")
 }
 
 model Account {
@@ -85,6 +95,7 @@ model Account {
 
   @@index([userId])
   @@map("account")
+  @@schema("production")
 }
 
 model Verification {
@@ -97,6 +108,7 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+  @@schema("production")
 }
 
 
@@ -104,16 +116,18 @@ model Bakery {
   id   Int    @id @default(autoincrement())
   name String
 
-  ownerId String  @unique
-  owner   User @relation("BakeryOwner", fields: [ownerId], references: [id])
+  ownerId String? @unique
+  owner   User? @relation("BakeryOwner", fields: [ownerId], references: [id])
 
   members   User[]     @relation("BakeryMembers")
   customers Customer[]
-  items     Item[]
+  products  Product[]
   orders    Order[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("production")
 }
 
 model Customer {
@@ -132,9 +146,11 @@ model Customer {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("production")
 }
 
-model Item {
+model Product {
   id       Int      @id @default(autoincrement())
   name     String
   category Category
@@ -144,16 +160,20 @@ model Item {
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
   createdById String
-  createdBy   User @relation("ItemCreatedBy", fields: [createdById], references: [id])
+  createdBy   User @relation("ProductCreatedBy", fields: [createdById], references: [id])
 
-  orderItems OrderItem[]
+  orderProducts OrderProduct[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("production")
 }
 
 model Order {
   id String @id @default(cuid())
+
+  bulkBatchId String?
 
   bakeryId Int
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
@@ -164,19 +184,21 @@ model Order {
   customerId Int
   customer   Customer @relation(fields: [customerId], references: [id])
 
-  orderItems OrderItem[]
+  orderProducts OrderProduct[]
   status     OrderStatus @default(PENDING)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("production")
 }
 
-model OrderItem {
+model OrderProduct {
   id        Int     @id @default(autoincrement())
   isRemoved Boolean @default(false)
 
-  itemId Int
-  item   Item @relation(fields: [itemId], references: [id])
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
 
   orderId String
   order   Order @relation(fields: [orderId], references: [id])
@@ -187,5 +209,6 @@ model OrderItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([itemId, orderId])
+  @@unique([productId, orderId])
+  @@schema("production")
 }

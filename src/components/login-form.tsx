@@ -11,12 +11,13 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { SignIn } from "@/server/sign-in"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 export function LoginForm({
   className,
@@ -26,6 +27,19 @@ export function LoginForm({
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [signInError, setSignInError] = useState("")
+  const [signInSuccess, setSignInSuccess] = useState("")
+
+  useEffect(() => {
+    if (!signInSuccess) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setSignInSuccess("")
+    }, 4000)
+
+    return () => window.clearTimeout(timeout)
+  }, [signInSuccess])
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -38,9 +52,11 @@ export function LoginForm({
             onSubmit={async (e) => {
               e.preventDefault()
               setSignInError("")
+              setSignInSuccess("")
               setIsLoading(true)
               try {
                 await SignIn(email, password)
+                setSignInSuccess("Login successful. Redirecting to dashboard...")
               } catch (error) {
                 const message = error instanceof Error ? error.message : "Failed to sign in. Please try again."
                 setSignInError(message)
@@ -84,8 +100,16 @@ export function LoginForm({
                   {isLoading ? "Logging in..." : "Login"}
                 </Button>
                 {signInError ? (
-                  <FieldDescription className="pt-2 text-center text-red-600">
+                  <FieldError className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-red-700">
                     {signInError}
+                  </FieldError>
+                ) : null}
+                {signInSuccess ? (
+                  <FieldDescription
+                    role="status"
+                    className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-emerald-700"
+                  >
+                    {signInSuccess}
                   </FieldDescription>
                 ) : null}
                 <FieldDescription className="text-center">

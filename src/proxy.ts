@@ -6,7 +6,22 @@ const PUBLIC_PATHS = ["/", "/login", "/signup"];
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
+    // Skip auth checks for framework internals and static/public files.
+    if (
+        pathname.startsWith("/_next") ||
+        pathname === "/favicon.ico" ||
+        pathname === "/robots.txt" ||
+        pathname === "/sitemap.xml" ||
+        pathname.includes(".")
+    ) {
+        return NextResponse.next();
+    }
+
     if (pathname.startsWith("/api/auth")) {
+        return NextResponse.next();
+    }
+
+    if (pathname === "/api/signup") {
         return NextResponse.next();
     }
 
@@ -38,6 +53,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+        "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)",
   ],
 };

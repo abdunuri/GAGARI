@@ -1,24 +1,22 @@
-import { NextResponse } from "next/server"
 import { authClient } from "../lib/auth-client"
+import { getAuthErrorMessage } from "@/lib/auth-error-message"
 
 
 export async function SignIn(email:string,password:string){
+    try {
+        const { data, error } = await authClient.signIn.email({
+                email,
+                password,
+                callbackURL: "/dashboard",
+                rememberMe: true
+        })
 
-    const { data, error } = await authClient.signIn.email({
-            email,
-            password,
-            callbackURL: "/dashboard",
-            rememberMe: true
-    })
+        if (error) {
+            throw new Error(getAuthErrorMessage(error, "signin"))
+        }
 
-    if (error) {
-        return NextResponse.json(
-            { message: error.message || "Authentication failed" },
-            { status: 401 }
-        )
+        return data
+    } catch (error) {
+        throw new Error(getAuthErrorMessage(error, "signin"), { cause: error })
     }
-
-    return NextResponse.json(
-        { message: "Logged in successfully", data },
-        { status: 200 }
-    )};
+};

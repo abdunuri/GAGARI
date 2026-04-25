@@ -4,6 +4,16 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
 const roleCopy = {
+    SYSTEM_ADMIN: {
+        title: "System Admin Dashboard",
+        description: "Manage platform-wide settings, bakeries, and privileged accounts.",
+        accent: "from-violet-500 to-indigo-600",
+        actions: [
+            { label: "Manage customers", href: "/customers" },
+            { label: "Review orders", href: "/orders" },
+            { label: "Add products", href: "/products" },
+        ],
+    },
     ADMIN: {
         title: "Admin Dashboard",
         description: "Oversee the bakery, manage staff workflows, and monitor activity.",
@@ -11,7 +21,7 @@ const roleCopy = {
         actions: [
             { label: "Manage customers", href: "/customers" },
             { label: "Review orders", href: "/orders" },
-            { label: "Add items", href: "/items" },
+            { label: "Add products", href: "/products" },
         ],
     },
     OWNER: {
@@ -20,7 +30,7 @@ const roleCopy = {
         accent: "from-sky-500 to-cyan-500",
         actions: [
             { label: "Create order", href: "/orders/new" },
-            { label: "Manage inventory", href: "/items" },
+            { label: "Manage inventory", href: "/products" },
             { label: "View customers", href: "/customers" },
         ],
     },
@@ -40,42 +50,59 @@ const roleCopy = {
         accent: "from-zinc-500 to-zinc-700",
         actions: [
             { label: "Browse orders", href: "/orders" },
-            { label: "Browse items", href: "/items" },
+            { label: "Browse products", href: "/products" },
             { label: "Customers", href: "/customers" },
         ],
     },
 } as const;
 
 export default async function Dashboard(){
-    const session = await auth.api.getSession({
-        headers:await headers()
-    })
+    let session = null
+    try {
+        session = await auth.api.getSession({
+            headers:await headers()
+        })
+    } catch {
+        session = null
+    }
 
     if(!session){
         redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
     }
+    const role = session.user.role as keyof typeof roleCopy;
+    if (role === "SYSTEM_ADMIN") {
+        redirect("/Admin");
+    }
+
     const bakeryId = Number(session.user.bakeryId);
     if (Number.isNaN(bakeryId)) {
         throw new Error("Invalid bakeryId in session");
-    }    const role = session.user.role as keyof typeof roleCopy;
-    const dashboard = roleCopy[role] ?? roleCopy.STAFF;
+    }
 
-    const [customerCount, itemCount, orderCount, pendingCount, recentOrders] = await Promise.all([
-        prisma.customer.count({ where: { bakeryId } }),
-        prisma.item.count({ where: { bakeryId } }),
-        prisma.order.count({ where: { bakeryId } }),
-        prisma.order.count({ where: { bakeryId, status: "PENDING" } }),
-        prisma.order.findMany({
+    const dashboard = roleCopy[role] ?? roleCopy.STAFF;
+    const showStats = role === "ADMIN" || role === "OWNER";
+    let recentOrders =  await prisma.order.findMany({
             where: { bakeryId },
-            include: { customer: true, orderItems: true },
+            include: { customer: true, orderProducts: true },
             orderBy: { createdAt: "desc" },
             take: 5,
-        }),
+        })
+    const [customerCount, productCount, orderCount, pendingCount] = await Promise.all([
+        prisma.customer.count({ where: { bakeryId } }),
+        prisma.product.count({ where: { bakeryId } }),
+        prisma.order.count({ where: { bakeryId } }),
+        prisma.order.count({ where: { bakeryId, status: "PENDING" } }),
     ]);
+
+    if(session.user.role !== "SYSTEM_ADMIN" && session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
+        recentOrders = recentOrders.filter(order => order.createdById === session.user.id);
+    }
+        
+
 
     const stats = [
         { label: "Customers", value: customerCount, hint: "Active bakery customers" },
-        { label: "Items", value: itemCount, hint: "Catalog entries" },
+        { label: "Products", value: productCount, hint: "Catalog entries" },
         { label: "Orders", value: orderCount, hint: "All orders" },
         { label: "Pending", value: pendingCount, hint: "Needs attention" },
     ];
@@ -97,15 +124,17 @@ export default async function Dashboard(){
                                 </p>
                             </div>
 
-                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                {stats.map((stat) => (
-                                    <div key={stat.label} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-                                        <p className="text-sm text-zinc-500">{stat.label}</p>
-                                        <p className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{stat.value}</p>
-                                        <p className="mt-1 text-xs text-zinc-500">{stat.hint}</p>
-                                    </div>
-                                ))}
-                            </div>
+                            {showStats && (
+                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    {stats.map((stat) => (
+                                        <div key={stat.label} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+                                            <p className="text-sm text-zinc-500">{stat.label}</p>
+                                            <p className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{stat.value}</p>
+                                            <p className="mt-1 text-xs text-zinc-500">{stat.hint}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -146,7 +175,6 @@ export default async function Dashboard(){
                                 <div key={order.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
-                                            <p className="font-medium text-zinc-900">#{order.id.slice(0, 8)}</p>
                                             <p className="text-sm text-zinc-500">{order.customer?.name ?? "Unknown"}</p>
                                         </div>
                                         <span

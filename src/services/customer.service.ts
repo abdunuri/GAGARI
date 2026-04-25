@@ -41,9 +41,23 @@ async function getCustomer() {
     }
 
     const bakeryId = Number(session.user.bakeryId);
+    const userId = session.user.id;
+    if(session.user.role === "ADMIN"||session.user.role === "OWNER"){
+        const customers = await prisma.customer.findMany({
+            where: {
+                bakeryId: bakeryId
+            },
+            include:{
+                bakery:true
+            }
+        });
+        return customers;
+    }
+
     const customers = await prisma.customer.findMany({
         where: {
-            bakeryId: bakeryId
+            bakeryId: bakeryId,
+            createdById: userId
         },
         include:{
             bakery:true

@@ -12,25 +12,57 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useState } from "react"
-import { SignUp } from "@/server/sign-up"
+import { useEffect, useState } from "react"
+
+type SignupContext = "BOOTSTRAP" | "SYSTEM_ADMIN" | "OWNER"
+type Role = "SYSTEM_ADMIN" | "ADMIN" | "OWNER" | "STAFF" | "VIEWER"
+
+const ROLE_OPTIONS: Record<SignupContext, Role[]> = {
+  BOOTSTRAP: ["SYSTEM_ADMIN"],
+  SYSTEM_ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
+  OWNER: ["STAFF", "VIEWER"],
+}
 
 export function SignupForm({
   className,
+  currentUserRole,
+  currentBakeryId,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & { currentUserRole: SignupContext; currentBakeryId: number | null }) {
+  const availableRoles = ROLE_OPTIONS[currentUserRole]
   const [email,setEmail] = useState("");
   const [name,setName] = useState("")
   const [password,setPassword] = useState("");
   const [confirmPassword,setConfirmPassword] = useState("");
-  const [role,setRole] = useState("STAFF");
+  const [role,setRole] = useState<Role>(availableRoles[0]);
   const [username,setUsername] = useState("")
+  const [bakeryId, setBakeryId] = useState("")
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (currentUserRole === "SYSTEM_ADMIN") {
+      setBakeryId("")
+    }
+  }, [currentUserRole])
+
+  useEffect(() => {
+    if (!success) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setSuccess("");
+    }, 4000);
+
+    return () => window.clearTimeout(timeout);
+  }, [success]);
 
 
   return (
@@ -46,21 +78,57 @@ export function SignupForm({
           <form onSubmit={async (e) =>{
             e.preventDefault();
             setError("");
+            setSuccess("");
 
             if (confirmPassword !== password) {
               setError("Passwords do not match.");
               return;
             }
 
+            const parsedBakeryId = Number.parseInt(bakeryId.trim(), 10);
+            const resolvedBakeryId =
+              currentUserRole === "OWNER"
+                ? currentBakeryId
+                : currentUserRole === "BOOTSTRAP"
+                  ? null
+                  : Number.isInteger(parsedBakeryId) && parsedBakeryId > 0
+                    ? parsedBakeryId
+                    : null;
+
+            if (currentUserRole === "SYSTEM_ADMIN" && resolvedBakeryId === null) {
+              setError("Bakery ID is required when system admin creates bakery users.");
+              return;
+            }
+
+            if (currentUserRole === "OWNER" && resolvedBakeryId === null) {
+              setError("Your bakery ID could not be determined. Please contact an administrator.");
+              return;
+            }
+
             try {
               setLoading(true);
-              await SignUp({
+              const response = await fetch("/api/signup", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
                 email:email,
                 password:password,
                 role:role,
                 username:username,
                 name:name,
+                currentUserRole,
+                bakeryId: resolvedBakeryId ?? undefined,
+                }),
               });
+
+              const result = (await response.json()) as { message?: string };
+              if (!response.ok) {
+                throw new Error(result.message ?? "Sign up failed. Please try again.");
+              }
+
+              setSuccess("Account created successfully. Please sign in with the new account.");
             } catch (err) {
               const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";
               setError(message);
@@ -93,13 +161,35 @@ export function SignupForm({
                   <Field>
                     <FieldLabel htmlFor="role">Role</FieldLabel>
                     <select id="role"  required className="w-full rounded-xl border px-3 py-2"
-                    value={role} onChange={(e)=> (setRole(e.target.value))}>
-                      <option value={"STAFF"} className="divide-y divide-zinc-200">STAFF</option>
-                      <option value={"ADMIN"} className="divide-y divide-zinc-200">ADMIN</option>
-                      <option value={"OWNER"} className="divide-y divide-zinc-200">OWNER</option>
-                      <option value={"VIEWER"} className="divide-y divide-zinc-200">VIEWER</option>
+                    value={role} onChange={(e)=> (setRole(e.target.value as Role))}>
+                      {availableRoles.map((option) => (
+                        <option key={option} value={option} className="divide-y divide-zinc-200">
+                          {option}
+                        </option>
+                      ))}
                     </select>
                   </Field>
+                  {currentUserRole === "SYSTEM_ADMIN" ? (
+                    <Field>
+                      <FieldLabel htmlFor="bakeryId">Bakery ID</FieldLabel>
+                      <Input
+                        id="bakeryId"
+                        type="number"
+                        placeholder="1"
+                        required
+                        value={bakeryId}
+                        onChange={(e) => setBakeryId(e.target.value)}
+                      />
+                      <FieldDescription>
+                        Use the bakery ID for the owner or staff account you are creating.
+                      </FieldDescription>
+                    </Field>
+                  ) : null}
+                {currentUserRole === "BOOTSTRAP" ? (
+                  <FieldDescription className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                    This is the first account in a new database. It will be created as a SYSTEM_ADMIN.
+                  </FieldDescription>
+                ) : null}
               <Field>
                 <Field className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field>
@@ -125,8 +215,16 @@ export function SignupForm({
                   {loading ? "Creating Account..." : "Create Account"}
                 </Button>
                 {error ? (
-                  <FieldDescription className="pt-2 text-center text-red-600">
+                  <FieldError className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-red-700">
                     {error}
+                  </FieldError>
+                ) : null}
+                {success ? (
+                  <FieldDescription
+                    role="status"
+                    className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-emerald-700"
+                  >
+                    {success}
                   </FieldDescription>
                 ) : null}
                 <FieldDescription className="text-center">

@@ -16,8 +16,8 @@ export const authClient = createAuthClient({
                     defaultValue: "",
                 },
                 bakeryId: {
-                    type: "string",
-                    required: true,
+                    type: "number",
+                    required: false,
                 },            },
         }),
     ],
