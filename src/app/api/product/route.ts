@@ -39,6 +39,7 @@ export async function POST(req:Request){
         );
     } catch (error) {
         if (error instanceof SyntaxError) {
+            console.error("Invalid JSON payload in product route", error);
             return NextResponse.json(
                 { message: "Invalid JSON payload." },
                 { status: 400 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAuthErrorMessage } from "@/lib/auth-error-message";
+import { getAuthErrorMessage, logServerError } from "@/lib/auth-error-message";
 
 type CreateBakeryOwnerBody = {
   bakeryName: string;
@@ -105,6 +105,7 @@ export async function POST(request: Request) {
       owner,
     });
   } catch (error) {
+    logServerError("Admin bakery creation failed", error);
     const message = getAuthErrorMessage(error, "signup");
 
     if (createdBakeryId !== null) {

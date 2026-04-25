@@ -57,7 +57,8 @@ export default function NewAdminPage() {
 
 			const data = (await response.json()) as CreateResult;
 			if (!response.ok) {
-				throw new Error(data.message || "Failed to create bakery and owner.");
+				setErrorMessage(data.message || "Failed to create bakery and owner.");
+				return;
 			}
 
 			setSuccess(data);

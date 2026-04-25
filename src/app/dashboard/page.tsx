@@ -76,7 +76,7 @@ export default async function Dashboard(){
 
     const bakeryId = Number(session.user.bakeryId);
     if (Number.isNaN(bakeryId)) {
-        throw new Error("Invalid bakeryId in session");
+        redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
     }
 
     const dashboard = roleCopy[role] ?? roleCopy.STAFF;

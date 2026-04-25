@@ -296,7 +296,8 @@ export default function NewOrderPage() {
       }));
 
       if (normalizedOrderProducts.some((product) => product.quantity <= 0)) {
-        throw new Error("Please enter quantity greater than 0 for all products");
+        setMessage("Please enter quantity greater than 0 for all products");
+        return;
       }
 
       const res = await fetch("/api/order", {
@@ -313,7 +314,8 @@ export default function NewOrderPage() {
       const data: NewOrderResponse = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Something went wrong");
+        setMessage(data.message || "Something went wrong");
+        return;
       }
 
       setMessage("Order created successfully");
@@ -334,17 +336,19 @@ export default function NewOrderPage() {
 
     try {
       if (!selectedBreadProduct) {
-        throw new Error("Select a bread product first");
+        setMessage("Select a bread product first");
+        return;
       }
 
       const rowsToSubmit = bulkRows.filter((row) => row.quantity > 0);
       const bulkBatchId = crypto.randomUUID();
 
       if (rowsToSubmit.length === 0) {
-        throw new Error("Enter at least one customer quantity");
+        setMessage("Enter at least one customer quantity");
+        return;
       }
 
-      await Promise.all(
+      const submissionResults = await Promise.all(
         rowsToSubmit.map(async (row) => {
           const res = await fetch("/api/order", {
             method: "POST",
@@ -367,12 +371,24 @@ export default function NewOrderPage() {
           const data: NewOrderResponse = await res.json();
 
           if (!res.ok) {
-            throw new Error(data.message || `Failed for ${row.customer.name}`);
+            return {
+              ok: false,
+              message: data.message || `Failed for ${row.customer.name}`,
+            } as const;
           }
 
-          return data.order;
+          return {
+            ok: true,
+            order: data.order,
+          } as const;
         })
       );
+
+      const failedSubmission = submissionResults.find((result) => !result.ok);
+      if (failedSubmission && !failedSubmission.ok) {
+        setMessage(failedSubmission.message);
+        return;
+      }
 
       setMessage(`Created ${rowsToSubmit.length} order${rowsToSubmit.length > 1 ? "s" : ""} successfully`);
       setBulkQuantities((current) => {

@@ -125,7 +125,8 @@ export function SignupForm({
 
               const result = (await response.json()) as { message?: string };
               if (!response.ok) {
-                throw new Error(result.message ?? "Sign up failed. Please try again.");
+                setError(result.message ?? "Sign up failed. Please try again.");
+                return;
               }
 
               setSuccess("Account created successfully. Please sign in with the new account.");
