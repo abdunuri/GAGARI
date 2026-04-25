@@ -217,6 +217,9 @@ model Item {
   id        Int     @id @default(autoincrement())
   name      String
   price     Decimal @db.Decimal(10, 2)
+  bakeryId Int
+
+  createdById String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
