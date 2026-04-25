@@ -9,13 +9,67 @@ type newProduct  = {
     category:  "BREAD" | "FASTF" | "CAKE",
     price:Decimal,
 };
+
+type updateProductInput = {
+    name: string;
+    category: "BREAD" | "FASTF" | "CAKE";
+    price: number;
+};
+
+function getLoginRedirectUrl() {
+    const baseUrl = process.env["BETTER_AUTH_URL"];
+    return baseUrl ? `${baseUrl.replace(/\/$/, "")}/login` : "/login";
+}
+
+function parseBakeryId(bakeryId: string | number | null | undefined) {
+    const parsed = Number(bakeryId);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+async function getAuthorizedProduct(productId: number) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session) {
+        redirect(getLoginRedirectUrl());
+    }
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new Error("Invalid bakeryId in session");
+    }
+
+    const product = await prisma.product.findFirst({
+        where: {
+            id: productId,
+            bakeryId,
+        },
+        select: {
+            id: true,
+            createdById: true,
+        },
+    });
+
+    if (!product) {
+        throw new Error("Product not found in this bakery.");
+    }
+
+    const canManageAnyProduct = session.user.role === "ADMIN" || session.user.role === "OWNER";
+    if (!canManageAnyProduct && product.createdById !== session.user.id) {
+        throw new Error("You are not allowed to manage this product.");
+    }
+
+    return product;
+}
+
 async function CreateProduct(newProduct:newProduct){
     const session = await auth.api.getSession({
         headers:await headers()
     })
 
     if(!session){
-        redirect(`${process.env["BETTER_AUTH_URL"]}/login`)
+        redirect(getLoginRedirectUrl())
     }
 
     const createdById = session.user.id
@@ -51,11 +105,11 @@ async function GetProducts() {
     });
 
     if (!session) {
-        redirect(`${process.env["BETTER_AUTH_URL"]}/login`);
+        redirect(getLoginRedirectUrl());
     }
 
-    const bakeryId = Number.parseInt(String(session.user.bakeryId), 10);
-    if (Number.isNaN(bakeryId)) {
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
         console.error("GetProducts rejected due to invalid bakeryId", {
             userId: session.user.id,
             bakeryId: session.user.bakeryId,
@@ -69,4 +123,40 @@ async function GetProducts() {
     return products
 }
 
-export {CreateProduct,GetProducts}
+async function UpdateProduct(productId: number, updateInput: updateProductInput) {
+    await getAuthorizedProduct(productId);
+
+    return prisma.product.update({
+        where: {
+            id: productId,
+        },
+        data: {
+            name: updateInput.name,
+            category: updateInput.category,
+            price: updateInput.price,
+        },
+    });
+}
+
+async function DeleteProduct(productId: number) {
+    await getAuthorizedProduct(productId);
+
+    const orderProductsCount = await prisma.orderProduct.count({
+        where: {
+            productId,
+            isRemoved: false,
+        },
+    });
+
+    if (orderProductsCount > 0) {
+        throw new Error("This product is already used in orders and cannot be deleted.");
+    }
+
+    return prisma.product.delete({
+        where: {
+            id: productId,
+        },
+    });
+}
+
+export {CreateProduct,GetProducts,UpdateProduct,DeleteProduct}

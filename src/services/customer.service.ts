@@ -8,6 +8,21 @@ type newCustomerInfo = {
     name:string,
     phoneNumber:string}
 
+type updateCustomerInfo = {
+    name: string;
+    phoneNumber: string;
+}
+
+function getLoginRedirectUrl() {
+    const baseUrl = process.env["BETTER_AUTH_URL"];
+    return baseUrl ? `${baseUrl.replace(/\/$/, "")}/login` : "/login";
+}
+
+function parseBakeryId(bakeryId: string | number | null | undefined) {
+    const parsed = Number(bakeryId);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 async function createCustomer(newCustomerInfo:newCustomerInfo){
     const session = await auth.api.getSession({
         headers:await headers()
@@ -37,15 +52,19 @@ async function getCustomer() {
     });
     if (!session) {
         console.log("login required");
-        redirect(`${process.env["BETTER_AUTH_URL"]}/login`);
+        redirect(getLoginRedirectUrl());
     }
 
-    const bakeryId = Number(session.user.bakeryId);
+    const bakeryId = parseBakeryId(session.user.bakeryId);
     const userId = session.user.id;
+    if (!bakeryId) {
+        throw new Error("Invalid bakeryId in session");
+    }
     if(session.user.role === "ADMIN"||session.user.role === "OWNER"){
         const customers = await prisma.customer.findMany({
             where: {
-                bakeryId: bakeryId
+                bakeryId,
+                isActive: true,
             },
             include:{
                 bakery:true
@@ -56,8 +75,9 @@ async function getCustomer() {
 
     const customers = await prisma.customer.findMany({
         where: {
-            bakeryId: bakeryId,
-            createdById: userId
+            bakeryId,
+            createdById: userId,
+            isActive: true,
         },
         include:{
             bakery:true
@@ -67,4 +87,91 @@ async function getCustomer() {
     return customers
 }
 
-export {createCustomer,getCustomer}
+async function updateCustomer(customerId: number, updateInfo: updateCustomerInfo) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session) {
+        redirect(getLoginRedirectUrl());
+    }
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new Error("Invalid bakeryId in session");
+    }
+
+    const existingCustomer = await prisma.customer.findFirst({
+        where: {
+            id: customerId,
+            bakeryId,
+            isActive: true,
+        },
+        select: {
+            id: true,
+            createdById: true,
+        },
+    });
+
+    if (!existingCustomer) {
+        throw new Error("Customer not found in this bakery.");
+    }
+
+    const canManageAnyCustomer = session.user.role === "ADMIN" || session.user.role === "OWNER";
+    if (!canManageAnyCustomer && existingCustomer.createdById !== session.user.id) {
+        throw new Error("You are not allowed to update this customer.");
+    }
+
+    return prisma.customer.update({
+        where: { id: customerId },
+        data: {
+            name: updateInfo.name,
+            phoneNumber: updateInfo.phoneNumber,
+        },
+    });
+}
+
+async function deleteCustomer(customerId: number) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session) {
+        redirect(getLoginRedirectUrl());
+    }
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new Error("Invalid bakeryId in session");
+    }
+
+    const existingCustomer = await prisma.customer.findFirst({
+        where: {
+            id: customerId,
+            bakeryId,
+            isActive: true,
+        },
+        select: {
+            id: true,
+            createdById: true,
+        },
+    });
+
+    if (!existingCustomer) {
+        throw new Error("Customer not found in this bakery.");
+    }
+
+    const canManageAnyCustomer = session.user.role === "ADMIN" || session.user.role === "OWNER";
+    if (!canManageAnyCustomer && existingCustomer.createdById !== session.user.id) {
+        throw new Error("You are not allowed to delete this customer.");
+    }
+
+    return prisma.customer.update({
+        where: { id: customerId },
+        data: {
+            isActive: false,
+        },
+    });
+}
+
+export {createCustomer,getCustomer,updateCustomer,deleteCustomer}

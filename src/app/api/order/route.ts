@@ -10,6 +10,7 @@ type OrderProductInput = {
 type CreateOrderRequestBody = {
     customerId: number;
     bulkBatchId?: string;
+    bulkExpectedCount?: number;
     orderProducts: OrderProductInput[];
 };
 
@@ -63,6 +64,7 @@ export async function POST(req:Request) {
         const order = await createOrder({
             customerId: body.customerId,
             bulkBatchId: typeof body.bulkBatchId === "string" ? body.bulkBatchId : undefined,
+            bulkExpectedCount: typeof body.bulkExpectedCount === "number" ? body.bulkExpectedCount : undefined,
             orderProducts: body.orderProducts.map((product) => ({
                 productId:product.productId,
                 unitPrice:product.unitPrice,

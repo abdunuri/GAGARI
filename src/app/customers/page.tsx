@@ -39,6 +39,84 @@ export default function CustomerPage() {
 
     void loadCustomers();
   }, []);
+
+  const handleEditCustomer = async (customer: Customer) => {
+    const nextName = window.prompt("Edit customer name", customer.name);
+    if (nextName === null) {
+      return;
+    }
+
+    const trimmedName = nextName.trim();
+    if (!trimmedName) {
+      setMessage("Customer name cannot be empty.");
+      return;
+    }
+
+    const nextPhone = window.prompt("Edit phone number", customer.phoneNumber);
+    if (nextPhone === null) {
+      return;
+    }
+
+    const trimmedPhone = nextPhone.trim();
+    if (!trimmedPhone) {
+      setMessage("Phone number cannot be empty.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/customer/${customer.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          phoneNumber: trimmedPhone,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage(data.message || "Failed to update customer");
+        return;
+      }
+
+      setCustomers((prev) =>
+        prev.map((item) =>
+          item.id === customer.id
+            ? { ...item, name: data.customer.name, phoneNumber: data.customer.phoneNumber }
+            : item
+        )
+      );
+      setMessage("Customer updated successfully");
+    } catch {
+      setMessage("Failed to update customer");
+    }
+  };
+
+  const handleDeleteCustomer = async (customer: Pick<Customer, "id" | "name">) => {
+    const shouldDelete = window.confirm(`Delete customer \"${customer.name}\"?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/customer/${customer.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage(data.message || "Failed to delete customer");
+        return;
+      }
+
+      setCustomers((prev) => prev.filter((item) => item.id !== customer.id));
+      setMessage("Customer deleted successfully");
+    } catch {
+      setMessage("Failed to delete customer");
+    }
+  };
   
 
 
@@ -146,17 +224,22 @@ export default function CustomerPage() {
           </div>
 
           <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
-            <div className="grid-cols-2 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold grid">
+            <div className="grid grid-cols-3 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold">
               <span>Customer Name</span>
               <span>Phone Number</span>
+              <span className="text-right">Actions</span>
             </div>
             <div className="divide-y divide-zinc-200">
               {customers.map((customer: Customer) =>{
                   return (
                   <CustomerRow
                   key={customer.id}
+                  id={customer.id}
                   customerName={customer.name}
-                  phoneNumber={customer.phoneNumber}/>
+                  phoneNumber={customer.phoneNumber}
+                  onEdit={handleEditCustomer}
+                  onDelete={handleDeleteCustomer}
+                  />
               )})}
             </div>
           </div>

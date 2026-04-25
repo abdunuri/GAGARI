@@ -1,6 +1,6 @@
 type FeatureCardProps = {
-    title:String;
-    description:String;
+  title: string;
+  description: string;
 }
 
 export default function FeatureCard({title,description}:FeatureCardProps){

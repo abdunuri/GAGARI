@@ -36,7 +36,7 @@ export async function POST(req:Request){
     }
 }
 
-export async function GET(req:Request){
+export async function GET(){
     try {
         const customers = await getCustomer();
         return NextResponse.json(

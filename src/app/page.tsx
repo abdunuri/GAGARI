@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Home() {
   return (
@@ -6,9 +7,11 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <img
-              src="Gagari_Logo.png"
+            <Image
+              src="/Gagari_Logo.png"
               alt="GaGari Logo"
+              width={32}
+              height={32}
               className="h-8 w-8 rounded-full object-cover"
             />
             <div>
@@ -65,19 +68,25 @@ export default function Home() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <img
+            <Image
               src="https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=900&q=80"
               alt="Fresh artisan bread on a wooden table"
+              width={900}
+              height={560}
               className="h-56 w-full rounded-3xl object-cover shadow-lg sm:h-72"
             />
-            <img
+            <Image
               src="https://images.unsplash.com/photo-1483695028939-5bb13f8648b0?auto=format&fit=crop&w=900&q=80"
               alt="Pastries displayed in a bakery showcase"
+              width={900}
+              height={560}
               className="h-56 w-full rounded-3xl object-cover shadow-lg sm:h-72"
             />
-            <img
+            <Image
               src="https://images.unsplash.com/photo-1517433670267-08bbd4be890f?auto=format&fit=crop&w=900&q=80"
               alt="Bakery staff preparing dough"
+              width={900}
+              height={560}
               className="h-56 w-full rounded-3xl object-cover shadow-lg sm:col-span-2 sm:h-72"
             />
           </div>

@@ -70,6 +70,17 @@ import { useRouter } from "next/navigation";
 const BULK_DRAFT_STORAGE_KEY = "bulk-order-draft";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
+function createBulkBatchId() {
+  const browserCrypto = typeof window !== "undefined" ? window.crypto : undefined;
+  if (browserCrypto?.randomUUID) {
+    return browserCrypto.randomUUID();
+  }
+
+  const timestampPart = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 12);
+  return `bulk-${timestampPart}-${randomPart}`;
+}
+
 export default function NewOrderPage() {
   const router = useRouter();
   const [activeMode, setActiveMode] = useState<Mode>("bulk");
@@ -341,7 +352,7 @@ export default function NewOrderPage() {
       }
 
       const rowsToSubmit = bulkRows.filter((row) => row.quantity > 0);
-      const bulkBatchId = crypto.randomUUID();
+      const bulkBatchId = createBulkBatchId();
 
       if (rowsToSubmit.length === 0) {
         setMessage("Enter at least one customer quantity");
@@ -357,6 +368,7 @@ export default function NewOrderPage() {
             },
             body: JSON.stringify({
               bulkBatchId,
+              bulkExpectedCount: rowsToSubmit.length,
               customerId: row.customer.id,
               orderProducts: [
                 {
