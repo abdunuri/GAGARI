@@ -128,7 +128,7 @@ export function SignupForm({
                 throw new Error(result.message ?? "Sign up failed. Please try again.");
               }
 
-              setSuccess("Account created successfully. Redirecting to dashboard...");
+              setSuccess("Account created successfully. Please sign in with the new account.");
             } catch (err) {
               const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";
               setError(message);

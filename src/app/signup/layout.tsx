@@ -10,15 +10,26 @@ export default async function SignupLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const userCount = await prisma.user.count();
+  let userCount = 1;
+  try {
+    userCount = await prisma.user.count();
+  } catch {
+    // Fail closed when DB is temporarily unreachable (e.g. DNS EAI_AGAIN).
+    userCount = 1;
+  }
 
   if (userCount === 0) {
     return <>{children}</>;
   }
 
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  let session = null;
+  try {
+    session = await auth.api.getSession({
+      headers: await headers(),
+    });
+  } catch {
+    session = null;
+  }
 
   if (!session) {
     redirect("/login");

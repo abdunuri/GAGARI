@@ -10,10 +10,22 @@ type SignupContext = "BOOTSTRAP" | "SYSTEM_ADMIN" | "OWNER"
 export const dynamic = "force-dynamic"
 
 export default async function SignupPage() {
-  const userCount = await prisma.user.count()
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  })
+  let userCount = 1
+  try {
+    userCount = await prisma.user.count()
+  } catch {
+    // Fail closed when DB is temporarily unreachable (e.g. DNS EAI_AGAIN).
+    userCount = 1
+  }
+
+  let session = null
+  try {
+    session = await auth.api.getSession({
+      headers: await headers(),
+    })
+  } catch {
+    session = null
+  }
   const currentBakeryId = session?.user.bakeryId ?? null
 
   const currentUserRole: SignupContext =

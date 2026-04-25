@@ -28,6 +28,7 @@ export const auth = betterAuth({
     },
     emailAndPassword : {
         enabled : true,
+        autoSignIn: false,
     },
     plugins:[nextCookies()]
 });
