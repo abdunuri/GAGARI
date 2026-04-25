@@ -212,3 +212,14 @@ model OrderProduct {
   @@unique([productId, orderId])
   @@schema("production")
 }
+
+model Item {
+  id        Int     @id @default(autoincrement())
+  name      String
+  price     Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("production")
+}

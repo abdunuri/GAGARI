@@ -55,7 +55,11 @@ export function LoginForm({
               setSignInSuccess("")
               setIsLoading(true)
               try {
-                await SignIn(email, password)
+                const result = await SignIn(email, password)
+                if (!result.ok) {
+                  setSignInError(result.message)
+                  return
+                }
                 setSignInSuccess("Login successful. Redirecting to dashboard...")
               } catch (error) {
                 const message = error instanceof Error ? error.message : "Failed to sign in. Please try again."

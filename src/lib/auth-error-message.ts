@@ -1,5 +1,42 @@
 type AuthAction = "signin" | "signup";
 
+type NormalizedErrorDetails = {
+  name?: string;
+  message?: string;
+  stack?: string;
+  code?: string;
+  status?: number;
+  cause?: NormalizedErrorDetails;
+};
+
+function normalizeErrorDetails(input: unknown, depth = 0): NormalizedErrorDetails {
+  if (!input || typeof input !== "object" || depth > 2) {
+    return {};
+  }
+
+  const value = input as Record<string, unknown>;
+  const normalized: NormalizedErrorDetails = {
+    name: typeof value.name === "string" ? value.name : undefined,
+    message: typeof value.message === "string" ? value.message : undefined,
+    stack: typeof value.stack === "string" ? value.stack : undefined,
+    code: typeof value.code === "string" ? value.code : undefined,
+    status: typeof value.status === "number" ? value.status : undefined,
+  };
+
+  if (value.cause) {
+    normalized.cause = normalizeErrorDetails(value.cause, depth + 1);
+  }
+
+  return normalized;
+}
+
+export function logServerError(scope: string, error: unknown) {
+  if (typeof window !== "undefined") {
+    return;
+  }
+  console.error(scope, normalizeErrorDetails(error));
+}
+
 function extractErrorDetails(input: unknown): { code: string; message: string; status: number | undefined } {
   const fallback = {
     code: "",
@@ -32,6 +69,13 @@ function extractErrorDetails(input: unknown): { code: string; message: string; s
 
 function mapByPattern(raw: string, action: AuthAction): string {
   const text = raw.toLowerCase();
+
+  if (
+    text.includes("invalid email or password") ||
+    text.includes("invalid_email_or_password")
+  ) {
+    return "Email or password is incorrect.";
+  }
 
   if (text.includes("failed to fetch") || text.includes("network") || text.includes("econn") || text.includes("timeout")) {
     return "Unable to reach the server. Check your connection and try again.";

@@ -1,5 +1,5 @@
 import { authClient } from "@/lib/auth-client";
-import { getAuthErrorMessage } from "@/lib/auth-error-message";
+import { getAuthErrorMessage, logServerError } from "@/lib/auth-error-message";
 
 type SignUpData = {
     email:string,
@@ -11,6 +11,10 @@ type SignUpData = {
     bakeryId?: number
 }
 
+export type SignUpResult =
+    | { ok: true; data: unknown }
+    | { ok: false; message: string }
+
 const ROLE_OPTIONS = {
     SYSTEM_ADMIN: ["ADMIN", "OWNER", "STAFF", "VIEWER"],
     OWNER: ["STAFF", "VIEWER"],
@@ -21,7 +25,12 @@ export async function SignUp(signupdata:SignUpData){
         const allowedRoles = ROLE_OPTIONS[signupdata.currentUserRole] as readonly SignUpData["role"][]
 
         if (!allowedRoles.includes(signupdata.role)) {
-            throw new Error(`Role ${signupdata.role} is not allowed for ${signupdata.currentUserRole.toLowerCase()}`)
+            const message = `Role ${signupdata.role} is not allowed for ${signupdata.currentUserRole.toLowerCase()}`
+            logServerError("Sign up failed", { message, code: "ROLE_NOT_ALLOWED", status: 403 })
+            return {
+                ok: false,
+                message,
+            } satisfies SignUpResult
         }
 
         const response = await authClient.signUp.email({
@@ -35,11 +44,22 @@ export async function SignUp(signupdata:SignUpData){
         });
 
         if (response?.error) {
-            throw new Error(getAuthErrorMessage(response.error, "signup"));
+            logServerError("Sign up failed", response.error)
+            return {
+                ok: false,
+                message: getAuthErrorMessage(response.error, "signup"),
+            } satisfies SignUpResult
         }
 
-        return response;
+        return {
+            ok: true,
+            data: response,
+        } satisfies SignUpResult;
     } catch (error) {
-        throw new Error(getAuthErrorMessage(error, "signup"), { cause: error });
+        logServerError("Sign up failed", error)
+        return {
+            ok: false,
+            message: getAuthErrorMessage(error, "signup"),
+        } satisfies SignUpResult;
     }
 }

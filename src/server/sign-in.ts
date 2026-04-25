@@ -1,6 +1,9 @@
 import { authClient } from "../lib/auth-client"
-import { getAuthErrorMessage } from "@/lib/auth-error-message"
+import { getAuthErrorMessage, logServerError } from "@/lib/auth-error-message"
 
+export type SignInResult =
+    | { ok: true; data: unknown }
+    | { ok: false; message: string }
 
 export async function SignIn(email:string,password:string){
     try {
@@ -12,11 +15,22 @@ export async function SignIn(email:string,password:string){
         })
 
         if (error) {
-            throw new Error(getAuthErrorMessage(error, "signin"))
+            logServerError("Sign in failed", error)
+            return {
+                ok: false,
+                message: getAuthErrorMessage(error, "signin"),
+            } satisfies SignInResult
         }
 
-        return data
+        return {
+            ok: true,
+            data,
+        } satisfies SignInResult
     } catch (error) {
-        throw new Error(getAuthErrorMessage(error, "signin"), { cause: error })
+        logServerError("Sign in failed", error)
+        return {
+            ok: false,
+            message: getAuthErrorMessage(error, "signin"),
+        } satisfies SignInResult
     }
 };

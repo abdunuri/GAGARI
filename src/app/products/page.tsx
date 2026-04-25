@@ -29,7 +29,8 @@ export default function ProductPage() {
         const data: GetProductsResponse = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.message || "Failed to fetch products");
+          setMessage(data.message || "Failed to fetch products");
+          return;
         }
 
         setProducts(data.products);
@@ -64,7 +65,8 @@ export default function ProductPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Something went wrong");
+        setMessage(data.message || "Something went wrong");
+        return;
       }
 
       setMessage("Product created successfully");

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAuthErrorMessage } from "@/lib/auth-error-message";
+import { getAuthErrorMessage, logServerError } from "@/lib/auth-error-message";
 
 type SignupContext = "BOOTSTRAP" | "SYSTEM_ADMIN" | "OWNER";
 type Role = "SYSTEM_ADMIN" | "ADMIN" | "OWNER" | "STAFF" | "VIEWER";
@@ -97,6 +97,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(response ?? { ok: true });
   } catch (error) {
+    logServerError("Signup API failed", error);
     const message = getAuthErrorMessage(error, "signup");
     return NextResponse.json({ message }, { status: 400 });
   }

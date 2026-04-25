@@ -27,7 +27,8 @@ export default function CustomerPage() {
         const data: GetCustomersResponse = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.message || "Failed to fetch customers");
+          setMessage(data.message || "Failed to fetch customers");
+          return;
         }
 
         setCustomers(data.customers);
@@ -61,7 +62,8 @@ export default function CustomerPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Something went wrong");
+        setMessage(data.message || "Something went wrong");
+        return;
       }
 
       setMessage("Customer created successfully");
