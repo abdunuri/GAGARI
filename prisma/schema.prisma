@@ -35,11 +35,11 @@ enum OrderStatus {
 }
 
 model User {
-  id       String @id
+  id            String    @id
   name          String
-  username String?
+  username      String?
   email         String?
-  role     Role
+  role          Role
   emailVerified Boolean   @default(false)
   image         String?
   createdAt     DateTime  @default(now())
@@ -55,6 +55,8 @@ model User {
   createdCustomers Customer[] @relation("CustomerCreatedBy")
   createdOrders    Order[]    @relation("OrderCreatedBy")
   createdProducts  Product[]  @relation("ProductCreatedBy")
+
+  displayUsername String?
 
   @@map("user")
   @@schema("production")
@@ -111,13 +113,12 @@ model Verification {
   @@schema("production")
 }
 
-
 model Bakery {
   id   Int    @id @default(autoincrement())
   name String
 
   ownerId String? @unique
-  owner   User? @relation("BakeryOwner", fields: [ownerId], references: [id])
+  owner   User?   @relation("BakeryOwner", fields: [ownerId], references: [id])
 
   members   User[]     @relation("BakeryMembers")
   customers Customer[]
@@ -140,7 +141,7 @@ model Customer {
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
   createdById String
-  createdBy   User @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  createdBy   User   @relation("CustomerCreatedBy", fields: [createdById], references: [id])
 
   orders Order[]
 
@@ -160,7 +161,7 @@ model Product {
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
   createdById String
-  createdBy   User @relation("ProductCreatedBy", fields: [createdById], references: [id])
+  createdBy   User   @relation("ProductCreatedBy", fields: [createdById], references: [id])
 
   orderProducts OrderProduct[]
 
@@ -179,13 +180,13 @@ model Order {
   bakery   Bakery @relation(fields: [bakeryId], references: [id])
 
   createdById String
-  createdBy   User @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  createdBy   User   @relation("OrderCreatedBy", fields: [createdById], references: [id])
 
   customerId Int
   customer   Customer @relation(fields: [customerId], references: [id])
 
   orderProducts OrderProduct[]
-  status     OrderStatus @default(PENDING)
+  status        OrderStatus    @default(PENDING)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -201,7 +202,7 @@ model OrderProduct {
   product   Product @relation(fields: [productId], references: [id])
 
   orderId String
-  order   Order @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId], references: [id])
 
   unitPrice Decimal @db.Decimal(10, 2)
   quantity  Int
@@ -216,9 +217,9 @@ model OrderProduct {
 model BulkBatch {
   id String @id
 
-  expectedCount Int
-  completedCount Int @default(0)
-  notified Boolean @default(false)
+  expectedCount  Int
+  completedCount Int     @default(0)
+  notified       Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -227,9 +228,9 @@ model BulkBatch {
 }
 
 model Item {
-  id        Int     @id @default(autoincrement())
-  name      String
-  price     Decimal @db.Decimal(10, 2)
+  id       Int     @id @default(autoincrement())
+  name     String
+  price    Decimal @db.Decimal(10, 2)
   bakeryId Int
 
   createdById String
