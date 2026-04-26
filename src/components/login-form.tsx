@@ -117,7 +117,7 @@ export function LoginForm({
                   </FieldDescription>
                 ) : null}
                 <FieldDescription className="text-center">
-                  Please if you don't have an account, get one from your Bakery Admin.
+                  Please if you don&apos;t have an account, get one from your Bakery Admin.
                 </FieldDescription>
               </Field>
             </FieldGroup>

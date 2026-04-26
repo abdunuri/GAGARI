@@ -9,6 +9,7 @@ const roleCopy = {
         description: "Manage platform-wide settings, bakeries, and privileged accounts.",
         accent: "from-violet-500 to-indigo-600",
         actions: [
+            { label: "New order", href: "/orders/new" },
             { label: "Manage customers", href: "/customers" },
             { label: "Review orders", href: "/orders" },
             { label: "Add products", href: "/products" },
@@ -19,6 +20,7 @@ const roleCopy = {
         description: "Oversee the bakery, manage staff workflows, and monitor activity.",
         accent: "from-emerald-500 to-teal-500",
         actions: [
+            { label: "New order", href: "/orders/new" },
             { label: "Manage customers", href: "/customers" },
             { label: "Review orders", href: "/orders" },
             { label: "Add products", href: "/products" },
@@ -29,7 +31,7 @@ const roleCopy = {
         description: "Track the full bakery business with a quick view of operations.",
         accent: "from-sky-500 to-cyan-500",
         actions: [
-            { label: "Create order", href: "/orders/new" },
+            { label: "New order", href: "/orders/new" },
             { label: "Manage inventory", href: "/products" },
             { label: "View customers", href: "/customers" },
         ],
@@ -39,8 +41,8 @@ const roleCopy = {
         description: "Handle daily order processing and customer support tasks.",
         accent: "from-amber-500 to-orange-500",
         actions: [
-            { label: "Open orders", href: "/orders" },
             { label: "New order", href: "/orders/new" },
+            { label: "Open orders", href: "/orders" },
             { label: "Customers", href: "/customers" },
         ],
     },
@@ -49,6 +51,7 @@ const roleCopy = {
         description: "Read-only access to bakery activity and operational summaries.",
         accent: "from-zinc-500 to-zinc-700",
         actions: [
+            { label: "New order", href: "/orders/new" },
             { label: "Browse orders", href: "/orders" },
             { label: "Browse products", href: "/products" },
             { label: "Customers", href: "/customers" },
@@ -122,6 +125,20 @@ export default async function Dashboard(){
                                 <p className="text-sm text-zinc-500">
                                     Signed in as <span className="font-medium text-zinc-800">{session.user.name}</span>
                                 </p>
+                                <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                                    <a
+                                        href="/orders/new"
+                                        className="inline-flex w-full items-center justify-center rounded-full bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 sm:w-auto"
+                                    >
+                                        New Order
+                                    </a>
+                                    <a
+                                        href="/orders"
+                                        className="inline-flex w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 sm:w-auto"
+                                    >
+                                        View Orders
+                                    </a>
+                                </div>
                             </div>
 
                             {showStats && (
@@ -153,10 +170,15 @@ export default async function Dashboard(){
                                 <a
                                     key={action.href}
                                     href={action.href}
-                                    className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 transition hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-white"
+                                    className={action.href === "/orders/new"
+                                        ? "rounded-2xl border border-zinc-900 bg-zinc-900 p-4 text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-zinc-800"
+                                        : "rounded-2xl border border-zinc-200 bg-zinc-50 p-4 transition hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-white"
+                                    }
                                 >
-                                    <p className="text-sm font-medium text-zinc-900">{action.label}</p>
-                                    <p className="mt-2 text-sm text-zinc-500">Open the workflow for this task.</p>
+                                    <p className={action.href === "/orders/new" ? "text-sm font-semibold text-white" : "text-sm font-medium text-zinc-900"}>{action.label}</p>
+                                    <p className={action.href === "/orders/new" ? "mt-2 text-sm text-zinc-200" : "mt-2 text-sm text-zinc-500"}>
+                                        {action.href === "/orders/new" ? "Start a new order immediately." : "Open the workflow for this task."}
+                                    </p>
                                 </a>
                             ))}
                         </div>

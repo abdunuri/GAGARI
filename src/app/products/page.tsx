@@ -42,6 +42,101 @@ export default function ProductPage() {
     void loadProducts();
   }, []);
 
+  const handleEditProduct = async (product: Product) => {
+    const nextName = window.prompt("Edit product name", product.name);
+    if (nextName === null) {
+      return;
+    }
+
+    const trimmedName = nextName.trim();
+    if (!trimmedName) {
+      setMessage("Product name cannot be empty.");
+      return;
+    }
+
+    const nextCategory = window.prompt("Edit category (BREAD, FASTF, CAKE)", product.category);
+    if (nextCategory === null) {
+      return;
+    }
+
+    const normalizedCategory = nextCategory.trim().toUpperCase();
+    if (normalizedCategory !== "BREAD" && normalizedCategory !== "FASTF" && normalizedCategory !== "CAKE") {
+      setMessage("Category must be BREAD, FASTF, or CAKE.");
+      return;
+    }
+
+    const nextPrice = window.prompt("Edit price", String(product.price));
+    if (nextPrice === null) {
+      return;
+    }
+
+    const parsedPrice = Number(nextPrice);
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      setMessage("Price must be a positive number.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/product/${product.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          category: normalizedCategory,
+          price: parsedPrice,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage(data.message || "Failed to update product");
+        return;
+      }
+
+      setProducts((prev) =>
+        prev.map((item) =>
+          item.id === product.id
+            ? {
+                ...item,
+                name: data.product.name,
+                category: data.product.category,
+                price: data.product.price,
+              }
+            : item
+        )
+      );
+      setMessage("Product updated successfully");
+    } catch {
+      setMessage("Failed to update product");
+    }
+  };
+
+  const handleDeleteProduct = async (product: Pick<Product, "id" | "name">) => {
+    const shouldDelete = window.confirm(`Delete product \"${product.name}\"?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/product/${product.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage(data.message || "Failed to delete product");
+        return;
+      }
+
+      setProducts((prev) => prev.filter((item) => item.id !== product.id));
+      setMessage("Product deleted successfully");
+    } catch {
+      setMessage("Failed to delete product");
+    }
+  };
+
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -166,19 +261,23 @@ export default function ProductPage() {
           </div>
 
           <div className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/90 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)] backdrop-blur">
-            <div className="grid grid-cols-3 border-b border-zinc-200 bg-gradient-to-r from-zinc-100 to-zinc-50 px-6 py-4 text-sm font-semibold">
+            <div className="grid grid-cols-4 border-b border-zinc-200 bg-gradient-to-r from-zinc-100 to-zinc-50 px-6 py-4 text-sm font-semibold">
               <span>Product</span>
               <span>Category</span>
               <span>Price</span>
+              <span className="text-right">Actions</span>
             </div>
             <div className="divide-y divide-zinc-200">
               {products.map((product: Product) =>{
                   return (
                   <ProductRow
                   key={product.id}
+                  id={product.id}
                   productName={product.name}
                   category={product.category}
                   price={product.price}
+                  onEdit={handleEditProduct}
+                  onDelete={handleDeleteProduct}
                   />
               )})}
             </div>
