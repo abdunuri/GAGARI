@@ -15,8 +15,6 @@ type OrderGroup = {
 };
 
 export default async function OrdersPage(){
-  // const res = await fetch(`${process.env["BETTER_AUTH_URL"]}/api/order`, { method: "GET" });
-  // const data: GetOrderResponse = await res.json()
   const orders: Order[] = await getOrders() ?? [];
   const pending = orders.filter((order) => order.status === "PENDING").length;
   const paid = orders.filter((order) => order.status === "PAID").length;
@@ -29,7 +27,7 @@ export default async function OrdersPage(){
         groups[groupId] = {
           id: groupId,
           isBulk: Boolean(order.bulkBatchId),
-          title: order.bulkBatchId ? `Bulk Order (${order.customer.name})` : order.customer.name,
+          title: order.bulkBatchId ? `Bulk Order (${orders.filter((o) => o.bulkBatchId === order.bulkBatchId).length} orders)` : order.customer.name,
           total: 0,
           status: "PENDING",
           orders: [],
@@ -71,8 +69,8 @@ export default async function OrdersPage(){
         </div>
 
 
-        <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
-          <div className="grid-cols-3 gap-1 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold grid">
+        <div className="overflow-hidden rounded-3xl">
+          <div className="grid-cols-3 gap-1 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold grid  rounded-3xl">
             <span>Customer</span>
             <span>Total</span>
             <span>Status</span>

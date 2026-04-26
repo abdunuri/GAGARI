@@ -285,30 +285,22 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
     return (
         <>
             {message && <p className="px-6 py-3 text-sm text-zinc-700">{message}</p>}
-            <p className="px-6 py-2 text-xs text-zinc-500">Double-click status to toggle PENDING and PAID. Edit icon changes quantity and total is recalculated.</p>
-            <div className="divide-y divide-zinc-200">
+            <div className="divide-y divide-zinc-200 gap-4  space-y-3">
                 {groups.map((group) => {
                     const isOpen = openGroupId === group.id;
 
                     return (
-                        <div key={group.id}>
-                            <button
-                                type="button"
-                                onClick={() => setOpenGroupId((current) => (current === group.id ? null : group.id))}
-                                className="grid w-full grid-cols-3 gap-4 px-6 py-4 text-left text-sm text-zinc-700 transition hover:bg-zinc-50"
-                            >
+                        <div key={group.id} className="border border-zinc-200 rounded-3xl">
+                            <div className="grid w-full grid-cols-3 gap-4 px-6 py-4 text-left text-sm text-zinc-700 transition hover:bg-zinc-50">
                                 <div className="flex flex-col gap-1">
+                                        {/* show date the order was placed */}
                                     <span className="font-medium text-zinc-900 md:font-normal">{group.title}</span>
-                                    {group.isBulk ? (
-                                        <span className="text-xs text-zinc-500">{group.orders.length} customer order{group.orders.length === 1 ? "" : "s"}</span>
-                                    ) : (
-                                        <span className="text-xs text-zinc-500">Tap to see item details and actions</span>
-                                    )}
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="font-medium text-zinc-900 md:font-normal">${group.total.toFixed(2)}</span>
                                 </div>
                                 <div className="flex items-center justify-between gap-3">
+                                    <button>
                                     <span
                                         onDoubleClick={(event) => {
                                             if (!group.isBulk && group.orders[0]) {
@@ -321,14 +313,20 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
                                     >
                                         {group.status}
                                     </span>
-                                    <span className="text-xs font-medium text-zinc-500">{isOpen ? "Close" : "Open"}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setOpenGroupId((current) => (current === group.id ? null : group.id))}
+                                        >
+                                    <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-900 hover:text-white lg:px-4 lg:py-1.5">
+                                        {isOpen ? "Close" : "Open"}</span>
+                                    </button>
                                 </div>
-                            </button>
-
+                            </div>
                             {isOpen && (
-                                <div className="border-t border-zinc-200 bg-zinc-50 px-6 py-3">
+                                <div className="border border-zinc-200 bg-zinc-50 px-6 py-3">
                                     {group.isBulk ? (
-                                        <div className="space-y-3">
+                                        <div className="space-y-3 rounded border border-emerald-400 bg-emerald-50 p-4">
                                             {group.orders.map((order) => (
                                                 <div key={order.id} className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700">
                                                     <div className="flex items-center justify-between gap-3">
@@ -337,16 +335,18 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
                                                             <p className="text-xs text-zinc-500">Quantity: {order.quantity}</p>
                                                         </div>
                                                         <div className="flex items-center gap-3">
-                                                            <div className="text-right">
-                                                                <p className="font-medium text-zinc-900">${order.total.toFixed(2)}</p>
-                                                                <p
-                                                                    onDoubleClick={() => handleToggleOrderStatus(order)}
-                                                                    className={`${statusColorMap[order.status]} cursor-pointer`}
-                                                                    title="Double click to toggle PENDING/PAID"
-                                                                >
-                                                                    {order.status}
-                                                                </p>
+                                                            <div className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-300 hover:text-white lg:px-4 lg:py-1.5">
+                                                                <button>
+                                                                    <p
+                                                                        onDoubleClick={() => handleToggleOrderStatus(order)}
+                                                                        className={`${statusColorMap[order.status]} cursor-pointer`}
+                                                                        title="Double click to toggle PENDING/PAID"
+                                                                    >
+                                                                        {order.status}
+                                                                    </p>
+                                                                </button>
                                                             </div>
+                                                                <p className="font-medium text-zinc-900">${order.total.toFixed(2)}</p>
                                                             <div className="flex items-center gap-2">
                                                                 <button
                                                                     type="button"
