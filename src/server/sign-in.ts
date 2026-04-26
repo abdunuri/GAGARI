@@ -13,7 +13,14 @@ export async function SignIn(email:string,password:string){
                 callbackURL: "/dashboard",
                 rememberMe: true
         })
-
+        if (error){
+            const {data,error} = await authClient.signIn.username({
+                username:email,
+                password,
+                callbackURL: "/dashboard",
+                rememberMe: true
+            })
+        }
         if (error) {
             logServerError("Sign in failed", error)
             return {

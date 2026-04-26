@@ -21,6 +21,10 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCategory, setEditCategory] = useState<"BREAD" | "FASTF" | "CAKE" | "">("");
+  const [editPrice, setEditPrice] = useState("");
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -42,49 +46,53 @@ export default function ProductPage() {
     void loadProducts();
   }, []);
 
-  const handleEditProduct = async (product: Product) => {
-    const nextName = window.prompt("Edit product name", product.name);
-    if (nextName === null) {
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setEditName(product.name);
+    setEditCategory(product.category);
+    setEditPrice(String(product.price));
+    setMessage("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProduct(null);
+    setEditName("");
+    setEditCategory("");
+    setEditPrice("");
+  };
+
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) {
       return;
     }
 
-    const trimmedName = nextName.trim();
+    const trimmedName = editName.trim();
     if (!trimmedName) {
       setMessage("Product name cannot be empty.");
       return;
     }
 
-    const nextCategory = window.prompt("Edit category (BREAD, FASTF, CAKE)", product.category);
-    if (nextCategory === null) {
-      return;
-    }
-
-    const normalizedCategory = nextCategory.trim().toUpperCase();
-    if (normalizedCategory !== "BREAD" && normalizedCategory !== "FASTF" && normalizedCategory !== "CAKE") {
+    if (editCategory !== "BREAD" && editCategory !== "FASTF" && editCategory !== "CAKE") {
       setMessage("Category must be BREAD, FASTF, or CAKE.");
       return;
     }
 
-    const nextPrice = window.prompt("Edit price", String(product.price));
-    if (nextPrice === null) {
-      return;
-    }
-
-    const parsedPrice = Number(nextPrice);
+    const parsedPrice = Number(editPrice);
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
       setMessage("Price must be a positive number.");
       return;
     }
 
     try {
-      const res = await fetch(`/api/product/${product.id}`, {
+      const res = await fetch(`/api/product/${editingProduct.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: trimmedName,
-          category: normalizedCategory,
+          category: editCategory,
           price: parsedPrice,
         }),
       });
@@ -97,7 +105,7 @@ export default function ProductPage() {
 
       setProducts((prev) =>
         prev.map((item) =>
-          item.id === product.id
+          item.id === editingProduct.id
             ? {
                 ...item,
                 name: data.product.name,
@@ -108,6 +116,7 @@ export default function ProductPage() {
         )
       );
       setMessage("Product updated successfully");
+      handleCancelEdit();
     } catch {
       setMessage("Failed to update product");
     }
@@ -284,6 +293,76 @@ export default function ProductPage() {
           </div>
         </div>
       </section>
+
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <form
+            onSubmit={handleSaveProduct}
+            className="w-full max-w-md space-y-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl"
+          >
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">Edit Product</h2>
+              <p className="mt-1 text-sm text-zinc-600">Update name, category, and price together.</p>
+            </div>
+
+            <div>
+              <label htmlFor="editProductName" className="mb-1 block text-sm font-medium text-zinc-800">Product Name</label>
+              <input
+                id="editProductName"
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="editProductCategory" className="mb-1 block text-sm font-medium text-zinc-800">Category</label>
+              <select
+                id="editProductCategory"
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value as "BREAD" | "FASTF" | "CAKE" | "")}
+                className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                required
+              >
+                <option value="">Select a category</option>
+                <option value="BREAD">Bread</option>
+                <option value="FASTF">Fast Food</option>
+                <option value="CAKE">Cake</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="editProductPrice" className="mb-1 block text-sm font-medium text-zinc-800">Price</label>
+              <input
+                id="editProductPrice"
+                type="text"
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)}
+                className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
     </main>
   );

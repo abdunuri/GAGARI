@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type OrderItem = {
@@ -38,6 +38,30 @@ const statusColorMap = {
     CANCELLED: "font-medium text-rose-600",
     MIXED: "font-medium text-zinc-600",
 } as const;
+
+type StatusToggleButtonProps = {
+    status: ChildOrder["status"] | OrderGroup["status"];
+    label: string;
+    canToggle: boolean;
+    title: string;
+    onToggle: () => void;
+};
+
+function StatusToggleButton({ status, label, canToggle, title, onToggle }: StatusToggleButtonProps) {
+    return (
+        <button
+            type="button"
+            onClick={canToggle ? onToggle : undefined}
+            aria-label={label}
+            aria-disabled={!canToggle}
+            disabled={!canToggle}
+            title={title}
+            className={`${statusColorMap[status]} ${canToggle ? "cursor-pointer" : "cursor-not-allowed opacity-60"} rounded-full border border-transparent px-2 py-1 text-left transition hover:border-zinc-300 hover:bg-zinc-100 disabled:hover:border-transparent disabled:hover:bg-transparent`}
+        >
+            {status}
+        </button>
+    );
+}
 
 function OrderItems({ items }: { items: OrderItem[] }) {
     return (
@@ -117,9 +141,10 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
     const router = useRouter();
     const [openGroupId, setOpenGroupId] = useState<string | null>(null);
     const [message, setMessage] = useState<string>("");
+    const inFlightOrders = useRef(new Set<string>());
 
     const handleDeleteOrder = async (order: Pick<ChildOrder, "id" | "customerName">) => {
-        const shouldDelete = window.confirm(`Delete order for \"${order.customerName}\"?`);
+        const shouldDelete = window.confirm(`Delete order for "${order.customerName}"?`);
         if (!shouldDelete) {
             return;
         }
@@ -148,27 +173,7 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
             return;
         }
 
-        let productToEdit = order.items[0];
-        if (order.items.length > 1) {
-            const productsText = order.items.map((item) => `${item.id} - ${item.name} (qty ${item.quantity})`).join("\n");
-            const pickedProductIdValue = window.prompt(
-                `Pick product id to edit quantity:\n${productsText}`,
-                String(order.items[0].id)
-            );
-
-            if (pickedProductIdValue === null) {
-                return;
-            }
-
-            const pickedProductId = Number(pickedProductIdValue);
-            const foundProduct = order.items.find((item) => item.id === pickedProductId);
-            if (!foundProduct) {
-                setMessage("Invalid product id selected.");
-                return;
-            }
-
-            productToEdit = foundProduct;
-        }
+        const productToEdit = order.items[0];
 
         const nextQuantityValue = window.prompt(
             `Edit quantity for ${productToEdit.name}`,
@@ -256,7 +261,12 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
             return;
         }
 
+        if (inFlightOrders.current.has(order.id)) {
+            return;
+        }
+
         const nextStatus = order.status === "PENDING" ? "PAID" : "PENDING";
+        inFlightOrders.current.add(order.id);
 
         try {
             const res = await fetch(`/api/order/${order.id}`, {
@@ -279,6 +289,8 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
             router.refresh();
         } catch {
             setMessage("Failed to toggle order status");
+        } finally {
+            inFlightOrders.current.delete(order.id);
         }
     };
 
@@ -300,20 +312,17 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
                                     <span className="font-medium text-zinc-900 md:font-normal">${group.total.toFixed(2)}</span>
                                 </div>
                                 <div className="flex items-center justify-between gap-3">
-                                    <button>
-                                    <span
-                                        onDoubleClick={(event) => {
-                                            if (!group.isBulk && group.orders[0]) {
-                                                event.stopPropagation();
+                                    <StatusToggleButton
+                                        status={group.status}
+                                        label={`Toggle status for ${group.title}`}
+                                        canToggle={!group.isBulk && Boolean(group.orders[0])}
+                                        title={!group.isBulk ? "Toggle status" : "Bulk orders cannot be toggled here"}
+                                        onToggle={() => {
+                                            if (group.orders[0]) {
                                                 void handleToggleOrderStatus(group.orders[0]);
                                             }
                                         }}
-                                        className={`${statusColorMap[group.status]} ${!group.isBulk ? "cursor-pointer" : ""}`}
-                                        title={!group.isBulk ? "Double click to toggle PENDING/PAID" : undefined}
-                                    >
-                                        {group.status}
-                                    </span>
-                                    </button>
+                                    />
                                     <button
                                         type="button"
                                         onClick={() => setOpenGroupId((current) => (current === group.id ? null : group.id))}
@@ -335,17 +344,13 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
                                                             <p className="text-xs text-zinc-500">Quantity: {order.quantity}</p>
                                                         </div>
                                                         <div className="flex items-center gap-3">
-                                                            <div className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-300 hover:text-white lg:px-4 lg:py-1.5">
-                                                                <button>
-                                                                    <p
-                                                                        onDoubleClick={() => handleToggleOrderStatus(order)}
-                                                                        className={`${statusColorMap[order.status]} cursor-pointer`}
-                                                                        title="Double click to toggle PENDING/PAID"
-                                                                    >
-                                                                        {order.status}
-                                                                    </p>
-                                                                </button>
-                                                            </div>
+                                                            <StatusToggleButton
+                                                                status={order.status}
+                                                                label={`Toggle status for ${order.customerName}`}
+                                                                canToggle={true}
+                                                                title="Toggle status"
+                                                                onToggle={() => void handleToggleOrderStatus(order)}
+                                                            />
                                                                 <p className="font-medium text-zinc-900">${order.total.toFixed(2)}</p>
                                                             <div className="flex items-center gap-2">
                                                                 <button

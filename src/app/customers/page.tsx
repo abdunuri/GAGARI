@@ -13,12 +13,31 @@ type GetCustomersResponse = {
   customers: Customer[];
 };
 
+type UpdateCustomerResponse = {
+  message?: string;
+  customer?: {
+    name?: string;
+    phoneNumber?: string;
+  };
+};
+
+async function readJsonResponse<T>(res: Response): Promise<T | null> {
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default function CustomerPage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -40,31 +59,45 @@ export default function CustomerPage() {
     void loadCustomers();
   }, []);
 
-  const handleEditCustomer = async (customer: Customer) => {
-    const nextName = window.prompt("Edit customer name", customer.name);
-    if (nextName === null) {
+  const handleEditCustomer = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setEditName(customer.name);
+    setEditPhone(customer.phoneNumber);
+    setMessage("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCustomer(null);
+    setEditName("");
+    setEditPhone("");
+  };
+
+  const handleSaveCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCustomer) {
       return;
     }
 
-    const trimmedName = nextName.trim();
+    const trimmedName = editName.trim();
     if (!trimmedName) {
       setMessage("Customer name cannot be empty.");
       return;
     }
 
-    const nextPhone = window.prompt("Edit phone number", customer.phoneNumber);
-    if (nextPhone === null) {
-      return;
-    }
-
-    const trimmedPhone = nextPhone.trim();
+    const trimmedPhone = editPhone.trim();
     if (!trimmedPhone) {
       setMessage("Phone number cannot be empty.");
       return;
     }
 
+    const phoneRegex = /^[+\d][\d\s-]*$/;
+    if (!phoneRegex.test(trimmedPhone)) {
+      setMessage("Phone number can include digits, spaces, + and - only.");
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/customer/${customer.id}`, {
+      const res = await fetch(`/api/customer/${editingCustomer.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -74,28 +107,32 @@ export default function CustomerPage() {
           phoneNumber: trimmedPhone,
         }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<UpdateCustomerResponse>(res);
 
       if (!res.ok) {
-        setMessage(data.message || "Failed to update customer");
+        setMessage(data?.message || "Failed to update customer");
         return;
       }
 
+      const nextName = data?.customer?.name ?? trimmedName;
+      const nextPhone = data?.customer?.phoneNumber ?? trimmedPhone;
+
       setCustomers((prev) =>
         prev.map((item) =>
-          item.id === customer.id
-            ? { ...item, name: data.customer.name, phoneNumber: data.customer.phoneNumber }
+          item.id === editingCustomer.id
+            ? { ...item, name: nextName, phoneNumber: nextPhone }
             : item
         )
       );
       setMessage("Customer updated successfully");
+      handleCancelEdit();
     } catch {
       setMessage("Failed to update customer");
     }
   };
 
   const handleDeleteCustomer = async (customer: Pick<Customer, "id" | "name">) => {
-    const shouldDelete = window.confirm(`Delete customer \"${customer.name}\"?`);
+    const shouldDelete = window.confirm(`Delete customer "${customer.name}"?`);
     if (!shouldDelete) {
       return;
     }
@@ -245,6 +282,60 @@ export default function CustomerPage() {
           </div>
         </div>
       </section>
+
+      {editingCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <form
+            onSubmit={handleSaveCustomer}
+            className="w-full max-w-md space-y-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl"
+          >
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">Edit Customer</h2>
+              <p className="mt-1 text-sm text-zinc-600">Update name and phone number together.</p>
+            </div>
+
+            <div>
+              <label htmlFor="editCustomerName" className="mb-1 block text-sm font-medium text-zinc-800">Customer Name</label>
+              <input
+                id="editCustomerName"
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="editCustomerPhone" className="mb-1 block text-sm font-medium text-zinc-800">Phone Number</label>
+              <input
+                id="editCustomerPhone"
+                type="text"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
     </main>
   );

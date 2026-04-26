@@ -1,10 +1,7 @@
 import { auth } from "@/lib/auth";
+import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { OrderStatus, Prisma } from "@prisma/client";
-import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -20,12 +17,44 @@ type createOrderInput = {
     }[];
 };
 
+type BatchOrderInput = {
+    customerId: number;
+    orderProducts: {
+        productId: number;
+        unitPrice: number;
+        quantity: number;
+    }[];
+};
+
+type CreateOrdersBatchInput = {
+    bulkBatchId: string;
+    bulkExpectedCount: number;
+    orders: BatchOrderInput[];
+};
+
 type updateOrderInput = {
     status?: OrderStatus;
     totalAmount?: number;
     productId?: number;
     quantity?: number;
 };
+
+type OrderServiceErrorCode =
+    | "INVALID_PAYLOAD"
+    | "NOT_FOUND"
+    | "NOT_ALLOWED"
+    | "PRODUCT_NOT_IN_ORDER"
+    | "UNAUTHORIZED";
+
+class OrderServiceError extends Error {
+    code: OrderServiceErrorCode;
+
+    constructor(code: OrderServiceErrorCode, message: string) {
+        super(message);
+        this.name = "OrderServiceError";
+        this.code = code;
+    }
+}
 
 type OrderNotificationPayload = {
     id: string;
@@ -65,6 +94,7 @@ type OrderListItem = {
     id: string;
     bulkBatchId: string | null;
     status: OrderStatus;
+    createdAt: Date;
     customer: {
         id: number;
         name: string;
@@ -79,10 +109,17 @@ type OrderListItem = {
     }[];
 };
 
+type CustomerLastDayBulkQuantity = {
+    customerId: number;
+    quantity: number;
+    orderedAt: Date;
+};
+
 const orderSelect = {
     id: true,
     bulkBatchId: true,
     status: true,
+    createdAt: true,
     customer: {
         select: {
             id: true,
@@ -103,14 +140,165 @@ const orderSelect = {
     },
 } as const;
 
-function getLoginRedirectUrl() {
-    const baseUrl = process.env["BETTER_AUTH_URL"];
-    return baseUrl ? `${baseUrl.replace(/\/$/, "")}/login` : "/login";
+function toCents(value: number) {
+    return Math.round(value * 100);
 }
 
-function parseBakeryId(bakeryId: string | number | null | undefined) {
-    const parsed = Number(bakeryId);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+function fromCents(value: number) {
+    return Number((value / 100).toFixed(2));
+}
+
+function findUnboundedCoinCombination(denominations: number[], target: number) {
+    const previous = new Array<number | null>(target + 1).fill(null);
+    const usedIndex = new Array<number>(target + 1).fill(-1);
+    previous[0] = 0;
+
+    for (let current = 0; current <= target; current++) {
+        if (current !== 0 && previous[current] === null) {
+            continue;
+        }
+
+        for (let index = 0; index < denominations.length; index++) {
+            const next = current + denominations[index];
+            if (next <= target && previous[next] === null) {
+                previous[next] = current;
+                usedIndex[next] = index;
+            }
+        }
+    }
+
+    if (previous[target] === null) {
+        return null;
+    }
+
+    const counts = new Array(denominations.length).fill(0);
+    let current = target;
+
+    while (current > 0) {
+        const index = usedIndex[current];
+        if (index < 0) {
+            return null;
+        }
+
+        counts[index] += 1;
+        current = previous[current] ?? 0;
+    }
+
+    return counts;
+}
+
+function findBoundedCoinCombination(denominations: number[], limits: number[], target: number) {
+    const memo = new Map<string, number[] | null>();
+
+    const search = (index: number, remaining: number): number[] | null => {
+        if (remaining === 0) {
+            return new Array(denominations.length - index).fill(0);
+        }
+
+        if (index === denominations.length) {
+            return null;
+        }
+
+        const key = `${index}:${remaining}`;
+        if (memo.has(key)) {
+            return memo.get(key) ?? null;
+        }
+
+        const denomination = denominations[index];
+        const maxUse = Math.min(limits[index], Math.floor(remaining / denomination));
+
+        for (let use = maxUse; use >= 0; use--) {
+            const tail = search(index + 1, remaining - use * denomination);
+            if (tail) {
+                const result = [use, ...tail];
+                memo.set(key, result);
+                return result;
+            }
+        }
+
+        memo.set(key, null);
+        return null;
+    };
+
+    return search(0, target);
+}
+
+function rebalanceOrderProductPrices(
+    products: Array<{ id: number; quantity: number; unitPrice: number }>,
+    targetTotal: number
+) {
+    const targetCents = toCents(targetTotal);
+    const priceCents = products.map((product) => toCents(product.unitPrice));
+    const quantities = products.map((product) => product.quantity);
+
+    let currentCents = 0;
+    for (let index = 0; index < products.length; index++) {
+        currentCents += priceCents[index] * quantities[index];
+    }
+
+    const deltaCents = targetCents - currentCents;
+    if (deltaCents === 0) {
+        return products;
+    }
+
+    const adjustments = new Array(products.length).fill(0);
+
+    if (deltaCents > 0) {
+        const positiveCounts = findUnboundedCoinCombination(quantities, deltaCents);
+        if (!positiveCounts) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Unable to reconcile rounded line items with the requested total amount."
+            );
+        }
+
+        for (let index = 0; index < positiveCounts.length; index++) {
+            adjustments[index] += positiveCounts[index];
+        }
+    } else {
+        const negativeTarget = Math.abs(deltaCents);
+        const limits = priceCents.map((priceCent) => Math.max(0, priceCent - 1));
+        const negativeCounts = findBoundedCoinCombination(quantities, limits, negativeTarget);
+        if (!negativeCounts) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Unable to safely reduce rounded line items to the requested total amount."
+            );
+        }
+
+        for (let index = 0; index < negativeCounts.length; index++) {
+            adjustments[index] -= negativeCounts[index];
+        }
+    }
+
+    const adjustedProducts = products.map((product, index) => {
+        const nextPriceCents = priceCents[index] + adjustments[index];
+        if (!Number.isInteger(nextPriceCents) || nextPriceCents <= 0) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Unable to persist a positive unit price after rounding adjustments."
+            );
+        }
+
+        return {
+            ...product,
+            unitPrice: fromCents(nextPriceCents),
+        };
+    });
+
+    const adjustedTotalCents = adjustedProducts.reduce(
+        (sum, product) => sum + toCents(product.unitPrice) * product.quantity,
+        0
+    );
+
+    if (adjustedTotalCents !== targetCents) {
+        throw new OrderServiceError(
+            "INVALID_PAYLOAD",
+            "Unable to reconcile rounded line items with the requested total amount."
+        );
+    }
+
+    return adjustedProducts;
 }
 
 function parseTelegramChatIds() {
@@ -241,79 +429,6 @@ function buildBulkBatchTelegramMessage(tableData: BulkBatchTableData, bulkBatchI
     return lines.join("\n");
 }
 
-function runPythonScript(args: string[]) {
-    return new Promise<void>((resolve, reject) => {
-        const pythonExecutable = process.env["PYTHON_EXECUTABLE"] || "python";
-        const processInstance = spawn(pythonExecutable, args, {
-            stdio: ["ignore", "pipe", "pipe"],
-            windowsHide: true,
-        });
-
-        let stderr = "";
-        processInstance.stderr.on("data", (chunk) => {
-            stderr += String(chunk);
-        });
-
-        processInstance.on("error", (error) => {
-            reject(error);
-        });
-
-        processInstance.on("close", (code) => {
-            if (code === 0) {
-                resolve();
-                return;
-            }
-            reject(new Error(stderr || `Python script failed with code ${code}`));
-        });
-    });
-}
-
-async function renderBulkBatchTableImage(tableData: BulkBatchTableData, bulkBatchId: string) {
-    const scriptPath = path.join(process.cwd(), "scripts", "render_bulk_table_image.py");
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gagari-telegram-"));
-    const payloadPath = path.join(tempDir, "bulk-table-payload.json");
-    const imagePath = path.join(tempDir, `bulk-${bulkBatchId}.png`);
-
-    const payload = {
-        title: "Bulk Order - Customer x Product Quantities",
-        batchId: bulkBatchId,
-        headers: tableData.headers,
-        rows: tableData.rows,
-    };
-
-    await fs.writeFile(payloadPath, JSON.stringify(payload), "utf8");
-    await runPythonScript([scriptPath, payloadPath, imagePath]);
-
-    return {
-        tempDir,
-        imagePath,
-    };
-}
-
-async function sendTelegramBulkPhoto(
-    telegramBotToken: string,
-    chatIds: string[],
-    imagePath: string,
-    caption: string
-) {
-    const imageBuffer = await fs.readFile(imagePath);
-
-    await Promise.allSettled(
-        chatIds.map((chatId) => {
-            const formData = new FormData();
-            formData.append("chat_id", chatId);
-            formData.append("caption", caption);
-            formData.append("parse_mode", "HTML");
-            formData.append("photo", new Blob([imageBuffer], { type: "image/png" }), path.basename(imagePath));
-
-            return fetch(`https://api.telegram.org/bot${telegramBotToken}/sendPhoto`, {
-                method: "POST",
-                body: formData,
-            });
-        })
-    );
-}
-
 async function sendTelegramBulkNotification(order: OrderNotificationPayload) {
     const telegramBotToken = process.env["TELEGRAM_BOT_TOKEN"];
     const chatIds = parseTelegramChatIds();
@@ -345,51 +460,20 @@ async function sendTelegramBulkNotification(order: OrderNotificationPayload) {
     );
 }
 
-async function maybeSendBulkBatchNotification(createdOrder: OrderNotificationPayload, bulkExpectedCount: number) {
-    if (!createdOrder.bulkBatchId || !Number.isInteger(bulkExpectedCount) || bulkExpectedCount <= 0) {
-        return;
-    }
+async function maybeSendBulkBatchNotification(
+    createdOrder: OrderNotificationPayload,
+    bulkExpectedCount: number,
+    completedCountDelta = 1
+) {
+    const bulkBatchId = createdOrder.bulkBatchId;
 
-    const batchOrders = await prisma.order.findMany({
-        where: {
-            bulkBatchId: createdOrder.bulkBatchId,
-            bakeryId: createdOrder.bakeryId,
-        },
-        select: {
-            id: true,
-            createdAt: true,
-            customer: {
-                select: {
-                    name: true,
-                },
-            },
-            orderProducts: {
-                select: {
-                    quantity: true,
-                    product: {
-                        select: {
-                            name: true,
-                        },
-                    },
-                },
-            },
-        },
-        orderBy: [
-            {
-                createdAt: "desc",
-            },
-            {
-                id: "desc",
-            },
-        ],
-    });
-
-    if (batchOrders.length !== bulkExpectedCount) {
-        return;
-    }
-
-    const latestOrder = batchOrders[0];
-    if (!latestOrder || latestOrder.id !== createdOrder.id) {
+    if (
+        !bulkBatchId ||
+        !Number.isInteger(bulkExpectedCount) ||
+        bulkExpectedCount <= 0 ||
+        !Number.isInteger(completedCountDelta) ||
+        completedCountDelta <= 0
+    ) {
         return;
     }
 
@@ -400,49 +484,110 @@ async function maybeSendBulkBatchNotification(createdOrder: OrderNotificationPay
         return;
     }
 
-    const tableData = buildBulkBatchTableData(batchOrders);
-    const textFallbackMessage = buildBulkBatchTelegramMessage(tableData, createdOrder.bulkBatchId, batchOrders.length);
-    const photoCaption = [
-        "<b>Bulk order submitted</b>",
-        `Batch ID: <code>${escapeTelegramHtml(createdOrder.bulkBatchId)}</code>`,
-        `Customers: <b>${batchOrders.length}</b>`,
-        `Total quantity: <b>${tableData.totalQuantity}</b>`,
-    ].join("\n");
-
-    let renderedImagePath: string | null = null;
-    let tempDirToCleanup: string | null = null;
-
-    try {
-        const rendered = await renderBulkBatchTableImage(tableData, createdOrder.bulkBatchId);
-        renderedImagePath = rendered.imagePath;
-        tempDirToCleanup = rendered.tempDir;
-        await sendTelegramBulkPhoto(telegramBotToken, chatIds, renderedImagePath, photoCaption);
-        return;
-    } catch (error) {
-        console.error("Failed to render/send bulk table image, falling back to text", error);
-    } finally {
-        if (tempDirToCleanup) {
-            await fs.rm(tempDirToCleanup, { recursive: true, force: true });
-        }
-    }
-
-    const message = textFallbackMessage;
-
-    await Promise.allSettled(
-        chatIds.map((chatId) =>
-            fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
+    await prisma.$transaction(async (tx) => {
+        const batchUpdate = await tx.bulkBatch.updateMany({
+            where: {
+                id: bulkBatchId,
+                notified: false,
+            },
+            data: {
+                completedCount: {
+                    increment: completedCountDelta,
                 },
-                body: JSON.stringify({
-                    chat_id: chatId,
-                    parse_mode: "HTML",
-                    text: message,
-                }),
-            })
-        )
-    );
+            },
+        });
+
+        if (batchUpdate.count === 0) {
+            return;
+        }
+
+        const batch = await tx.bulkBatch.findUnique({
+            where: {
+                id: bulkBatchId,
+            },
+            select: {
+                completedCount: true,
+                expectedCount: true,
+                notified: true,
+            },
+        });
+
+        if (!batch || batch.notified || batch.completedCount !== batch.expectedCount) {
+            return;
+        }
+
+        const notificationState = await tx.bulkBatch.updateMany({
+            where: {
+                id: bulkBatchId,
+                notified: false,
+                completedCount: batch.completedCount,
+            },
+            data: {
+                notified: true,
+            },
+        });
+
+        if (notificationState.count === 0) {
+            return;
+        }
+
+        const batchOrders = await tx.order.findMany({
+            where: {
+                bulkBatchId,
+                bakeryId: createdOrder.bakeryId,
+            },
+            select: {
+                id: true,
+                createdAt: true,
+                customer: {
+                    select: {
+                        name: true,
+                    },
+                },
+                orderProducts: {
+                    select: {
+                        quantity: true,
+                        product: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: [
+                {
+                    createdAt: "desc",
+                },
+                {
+                    id: "desc",
+                },
+            ],
+        });
+
+        if (batchOrders.length === 0) {
+            return;
+        }
+
+        const tableData = buildBulkBatchTableData(batchOrders);
+        const textFallbackMessage = buildBulkBatchTelegramMessage(tableData, bulkBatchId, batchOrders.length);
+
+        await Promise.allSettled(
+            chatIds.map((chatId) =>
+                fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        parse_mode: "HTML",
+                        text: textFallbackMessage,
+                    }),
+                })
+            )
+        );
+    });
 }
 
 async function createOrder(orderinput: createOrderInput) {
@@ -459,6 +604,21 @@ async function createOrder(orderinput: createOrderInput) {
 
     if (!bakeryId) {
         throw new Error("Your account is not linked to a bakery.");
+    }
+
+    if (orderinput.bulkBatchId && typeof orderinput.bulkExpectedCount === "number") {
+        await prisma.bulkBatch.upsert({
+            where: {
+                id: orderinput.bulkBatchId,
+            },
+            create: {
+                id: orderinput.bulkBatchId,
+                expectedCount: orderinput.bulkExpectedCount,
+            },
+            update: {
+                expectedCount: orderinput.bulkExpectedCount,
+            },
+        });
     }
 
     const customer = await prisma.customer.findFirst({
@@ -517,7 +677,7 @@ async function createOrder(orderinput: createOrderInput) {
     if (order.bulkBatchId) {
         try {
             if (typeof orderinput.bulkExpectedCount === "number") {
-                await maybeSendBulkBatchNotification(order, orderinput.bulkExpectedCount);
+                await maybeSendBulkBatchNotification(order, orderinput.bulkExpectedCount, 1);
             } else {
                 await sendTelegramBulkNotification(order);
             }
@@ -551,6 +711,151 @@ async function createOrder(orderinput: createOrderInput) {
     return order;
     
 };
+
+async function createOrdersBatch(batchInput: CreateOrdersBatchInput) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session) {
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
+    }
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
+    }
+
+    if (!batchInput.bulkBatchId || !Number.isInteger(batchInput.bulkExpectedCount) || batchInput.bulkExpectedCount <= 0) {
+        throw new OrderServiceError("INVALID_PAYLOAD", "Invalid bulk batch metadata.");
+    }
+
+    if (!Array.isArray(batchInput.orders) || batchInput.orders.length === 0) {
+        throw new OrderServiceError("INVALID_PAYLOAD", "At least one order is required.");
+    }
+
+    if (batchInput.orders.length !== batchInput.bulkExpectedCount) {
+        throw new OrderServiceError("INVALID_PAYLOAD", "Bulk order count does not match the submitted orders.");
+    }
+
+    for (const order of batchInput.orders) {
+        if (!Number.isInteger(order.customerId) || order.customerId <= 0) {
+            throw new OrderServiceError("INVALID_PAYLOAD", "Each order must include a valid customer id.");
+        }
+
+        if (!Array.isArray(order.orderProducts) || order.orderProducts.length === 0) {
+            throw new OrderServiceError("INVALID_PAYLOAD", "Each order must include at least one product.");
+        }
+
+        for (const product of order.orderProducts) {
+            if (
+                !Number.isInteger(product.productId) ||
+                product.productId <= 0 ||
+                !Number.isFinite(product.unitPrice) ||
+                product.unitPrice < 0 ||
+                !Number.isInteger(product.quantity) ||
+                product.quantity <= 0
+            ) {
+                throw new OrderServiceError("INVALID_PAYLOAD", "Each product must include valid product, price, and quantity values.");
+            }
+        }
+    }
+
+    await prisma.bulkBatch.upsert({
+        where: {
+            id: batchInput.bulkBatchId,
+        },
+        create: {
+            id: batchInput.bulkBatchId,
+            expectedCount: batchInput.bulkExpectedCount,
+        },
+        update: {
+            expectedCount: batchInput.bulkExpectedCount,
+        },
+    });
+
+    const customerIds = [...new Set(batchInput.orders.map((order) => order.customerId))];
+    const productIds = [...new Set(batchInput.orders.flatMap((order) => order.orderProducts.map((product) => product.productId)))];
+
+    const [customers, products] = await Promise.all([
+        prisma.customer.findMany({
+            where: {
+                id: {
+                    in: customerIds,
+                },
+                bakeryId,
+                isActive: true,
+            },
+            select: {
+                id: true,
+            },
+        }),
+        prisma.product.findMany({
+            where: {
+                id: {
+                    in: productIds,
+                },
+                bakeryId,
+            },
+            select: {
+                id: true,
+            },
+        }),
+    ]);
+
+    if (customers.length !== customerIds.length) {
+        throw new OrderServiceError("NOT_FOUND", "One or more customers were not found in this bakery.");
+    }
+
+    if (products.length !== productIds.length) {
+        throw new OrderServiceError("NOT_ALLOWED", "One or more products do not belong to this bakery.");
+    }
+
+    const createdOrders = await prisma.$transaction(async (tx) => {
+        const results: OrderNotificationPayload[] = [];
+
+        for (const orderInput of batchInput.orders) {
+            const createdOrder = await tx.order.create({
+                data: {
+                    createdById: session.user.id,
+                    bakeryId,
+                    customerId: orderInput.customerId,
+                    bulkBatchId: batchInput.bulkBatchId,
+                    orderProducts: {
+                        create: orderInput.orderProducts.map((product) => ({
+                            productId: product.productId,
+                            unitPrice: product.unitPrice,
+                            quantity: product.quantity,
+                        })),
+                    },
+                },
+                include: {
+                    orderProducts: true,
+                    customer: true,
+                },
+            });
+
+            results.push(createdOrder);
+        }
+
+        return results;
+    });
+
+    const notificationSeedOrder = createdOrders[createdOrders.length - 1];
+    if (notificationSeedOrder) {
+        try {
+            await maybeSendBulkBatchNotification(
+                notificationSeedOrder,
+                batchInput.bulkExpectedCount,
+                createdOrders.length
+            );
+        } catch (error) {
+            console.error("Failed to send bulk order notification", error);
+        }
+    }
+
+    return createdOrders;
+}
 
 async function getOrders(page = 1, pageSize = 20): Promise<OrderListItem[]> {
     const session = await auth.api.getSession({
@@ -598,18 +903,93 @@ async function getOrders(page = 1, pageSize = 20): Promise<OrderListItem[]> {
     return orders
 };
 
+async function getCustomerLastDayBulkQuantities(): Promise<CustomerLastDayBulkQuantity[]> {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session) {
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
+    }
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
+    }
+
+    const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const orders = await prisma.order.findMany({
+        where: {
+            bakeryId,
+            bulkBatchId: {
+                not: null,
+            },
+            ...(canManageAnyOrder
+                ? {}
+                : {
+                    createdById: session.user.id,
+                }),
+        },
+        select: {
+            customerId: true,
+            createdAt: true,
+            orderProducts: {
+                select: {
+                    quantity: true,
+                },
+            },
+        },
+        orderBy: [
+            {
+                createdAt: "desc",
+            },
+            {
+                id: "desc",
+            },
+        ],
+        take: 5000,
+    });
+
+    const sameDayFallback = new Map<number, CustomerLastDayBulkQuantity>();
+    const previousDayCandidates = new Map<number, CustomerLastDayBulkQuantity>();
+
+    for (const order of orders) {
+        const quantity = order.orderProducts.reduce((sum, item) => sum + item.quantity, 0);
+        const snapshot: CustomerLastDayBulkQuantity = {
+            customerId: order.customerId,
+            quantity,
+            orderedAt: order.createdAt,
+        };
+
+        if (!sameDayFallback.has(order.customerId)) {
+            sameDayFallback.set(order.customerId, snapshot);
+        }
+
+        if (order.createdAt < startOfToday && !previousDayCandidates.has(order.customerId)) {
+            previousDayCandidates.set(order.customerId, snapshot);
+        }
+    }
+
+    return [...sameDayFallback.keys()].map((customerId) => {
+        return previousDayCandidates.get(customerId) ?? sameDayFallback.get(customerId)!;
+    });
+}
+
 async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     const session = await auth.api.getSession({
         headers: await headers(),
     });
 
     if (!session) {
-        redirect(getLoginRedirectUrl());
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
     }
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     if (!bakeryId) {
-        throw new Error("Your account is not linked to a bakery.");
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
     }
 
     const order = await prisma.order.findFirst({
@@ -624,12 +1004,12 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     });
 
     if (!order) {
-        throw new Error("Order not found in this bakery.");
+        throw new OrderServiceError("NOT_FOUND", "Order not found in this bakery.");
     }
 
     const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
     if (!canManageAnyOrder && order.createdById !== session.user.id) {
-        throw new Error("You are not allowed to update this order.");
+        throw new OrderServiceError("NOT_ALLOWED", "You are not allowed to update this order.");
     }
 
     const shouldUpdateStatus = typeof updateInput.status !== "undefined";
@@ -637,12 +1017,19 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     const shouldUpdateQuantity = typeof updateInput.productId !== "undefined" || typeof updateInput.quantity !== "undefined";
 
     if (shouldUpdateQuantity) {
+        if (shouldUpdateStatus || shouldUpdateAmount) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Quantity updates cannot be combined with status or totalAmount updates."
+            );
+        }
+
         if (typeof updateInput.productId !== "number" || !Number.isInteger(updateInput.productId) || updateInput.productId <= 0) {
-            throw new Error("Product id must be a valid positive integer.");
+            throw new OrderServiceError("INVALID_PAYLOAD", "Product id must be a valid positive integer.");
         }
 
         if (typeof updateInput.quantity !== "number" || !Number.isInteger(updateInput.quantity) || updateInput.quantity <= 0) {
-            throw new Error("Quantity must be a positive integer.");
+            throw new OrderServiceError("INVALID_PAYLOAD", "Quantity must be a positive integer.");
         }
 
         const orderProduct = await prisma.orderProduct.findFirst({
@@ -656,7 +1043,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
         });
 
         if (!orderProduct) {
-            throw new Error("Product not found in this order.");
+            throw new OrderServiceError("PRODUCT_NOT_IN_ORDER", "Product not found in this order.");
         }
 
         return prisma.orderProduct.update({
@@ -673,7 +1060,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     }
 
     if (!shouldUpdateStatus && !shouldUpdateAmount) {
-        throw new Error("Nothing to update for this order.");
+        throw new OrderServiceError("INVALID_PAYLOAD", "Nothing to update for this order.");
     }
 
     if (!shouldUpdateAmount) {
@@ -689,7 +1076,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
 
     const targetTotal = Number(updateInput.totalAmount);
     if (!Number.isFinite(targetTotal) || targetTotal <= 0) {
-        throw new Error("Total amount must be a positive number.");
+        throw new OrderServiceError("INVALID_PAYLOAD", "Total amount must be a positive number.");
     }
 
     const orderWithProducts = await prisma.order.findFirst({
@@ -713,7 +1100,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     });
 
     if (!orderWithProducts || orderWithProducts.orderProducts.length === 0) {
-        throw new Error("Order does not have items to update amount.");
+        throw new OrderServiceError("NOT_FOUND", "Order does not have items to update amount.");
     }
 
     const currentTotal = orderWithProducts.orderProducts.reduce(
@@ -722,7 +1109,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     );
 
     if (currentTotal <= 0) {
-        throw new Error("Current order total is invalid.");
+        throw new OrderServiceError("INVALID_PAYLOAD", "Current order total is invalid.");
     }
 
     const scale = targetTotal / currentTotal;
@@ -740,12 +1127,23 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
             .slice(0, lastIndex)
             .reduce((sum, product) => sum + product.unitPrice * product.quantity, 0);
         const lastQuantity = updatedProducts[lastIndex].quantity;
+        if (lastQuantity <= 0) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Last order item quantity must be greater than zero before adjusting total amount."
+            );
+        }
+
         const adjustedLastPrice = toTwo((targetTotal - subtotalWithoutLast) / lastQuantity);
-        updatedProducts[lastIndex].unitPrice = adjustedLastPrice > 0 ? adjustedLastPrice : 0.01;
+        if (Number.isFinite(adjustedLastPrice) && adjustedLastPrice > 0) {
+            updatedProducts[lastIndex].unitPrice = adjustedLastPrice;
+        }
     }
 
+    const rebalancedProducts = rebalanceOrderProductPrices(updatedProducts, targetTotal);
+
     return prisma.$transaction(async (tx) => {
-        for (const product of updatedProducts) {
+        for (const product of rebalancedProducts) {
             await tx.orderProduct.update({
                 where: {
                     id: product.id,
@@ -781,12 +1179,12 @@ async function deleteOrder(orderId: string) {
     });
 
     if (!session) {
-        redirect(getLoginRedirectUrl());
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
     }
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     if (!bakeryId) {
-        throw new Error("Your account is not linked to a bakery.");
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
     }
 
     const order = await prisma.order.findFirst({
@@ -801,12 +1199,12 @@ async function deleteOrder(orderId: string) {
     });
 
     if (!order) {
-        throw new Error("Order not found in this bakery.");
+        throw new OrderServiceError("NOT_FOUND", "Order not found in this bakery.");
     }
 
     const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
     if (!canManageAnyOrder && order.createdById !== session.user.id) {
-        throw new Error("You are not allowed to delete this order.");
+        throw new OrderServiceError("NOT_ALLOWED", "You are not allowed to delete this order.");
     }
 
     return prisma.$transaction(async (tx) => {
@@ -824,4 +1222,4 @@ async function deleteOrder(orderId: string) {
     });
 }
 
-export {createOrder ,getOrders,updateOrder,deleteOrder};
+export {createOrder, createOrdersBatch, getOrders, getCustomerLastDayBulkQuantities, updateOrder, deleteOrder,OrderServiceError};

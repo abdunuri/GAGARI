@@ -1,4 +1,6 @@
 import { auth } from "@/lib/auth";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
+import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/client"
 import { headers } from "next/headers";
@@ -15,16 +17,6 @@ type updateProductInput = {
     category: "BREAD" | "FASTF" | "CAKE";
     price: number;
 };
-
-function getLoginRedirectUrl() {
-    const baseUrl = process.env["BETTER_AUTH_URL"];
-    return baseUrl ? `${baseUrl.replace(/\/$/, "")}/login` : "/login";
-}
-
-function parseBakeryId(bakeryId: string | number | null | undefined) {
-    const parsed = Number(bakeryId);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
 
 async function getAuthorizedProduct(productId: number) {
     const session = await auth.api.getSession({
@@ -52,12 +44,12 @@ async function getAuthorizedProduct(productId: number) {
     });
 
     if (!product) {
-        throw new Error("Product not found in this bakery.");
+        throw new NotFoundError("Product not found in this bakery.");
     }
 
     const canManageAnyProduct = session.user.role === "ADMIN" || session.user.role === "OWNER";
     if (!canManageAnyProduct && product.createdById !== session.user.id) {
-        throw new Error("You are not allowed to manage this product.");
+        throw new ForbiddenError("You are not allowed to manage this product.");
     }
 
     return product;
@@ -73,15 +65,9 @@ async function CreateProduct(newProduct:newProduct){
     }
 
     const createdById = session.user.id
-    const rawBakeryId = session.user.bakeryId;
-    const bakeryId = Number.parseInt(String(rawBakeryId), 10);
-
-    if (Number.isNaN(bakeryId)) {
-        console.error("CreateProduct rejected due to invalid bakeryId", {
-            userId: session.user.id,
-            bakeryId: rawBakeryId,
-        });
-        throw new TypeError("Invalid bakeryId in user session");
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new Error("Invalid bakeryId in session");
     }
 
     const product = await prisma.product.create({
@@ -144,12 +130,11 @@ async function DeleteProduct(productId: number) {
     const orderProductsCount = await prisma.orderProduct.count({
         where: {
             productId,
-            isRemoved: false,
         },
     });
 
     if (orderProductsCount > 0) {
-        throw new Error("This product is already used in orders and cannot be deleted.");
+        throw new ConflictError("This product is already used in orders and cannot be deleted.");
     }
 
     return prisma.product.delete({

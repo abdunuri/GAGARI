@@ -1,4 +1,6 @@
 import { auth } from "@/lib/auth"
+import { ForbiddenError, NotFoundError } from "@/lib/errors"
+import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
@@ -13,14 +15,62 @@ type updateCustomerInfo = {
     phoneNumber: string;
 }
 
-function getLoginRedirectUrl() {
-    const baseUrl = process.env["BETTER_AUTH_URL"];
-    return baseUrl ? `${baseUrl.replace(/\/$/, "")}/login` : "/login";
+type CustomerActor = {
+    id: string;
+    role: string | null | undefined;
+    bakeryId?: string | number | null | undefined;
 }
 
-function parseBakeryId(bakeryId: string | number | null | undefined) {
-    const parsed = Number(bakeryId);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+async function getAuthorizedCustomer(
+    customerId: number,
+    requestHeaders: Awaited<ReturnType<typeof headers>>,
+    action: "update" | "delete"
+): Promise<{ customer: { id: number; createdById: string }; actor: CustomerActor }> {
+    const session = await auth.api.getSession({
+        headers: requestHeaders,
+    });
+
+    if (!session) {
+        redirect(getLoginRedirectUrl());
+    }
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new Error("Invalid bakeryId in session");
+    }
+
+    const customer = await prisma.customer.findFirst({
+        where: {
+            id: customerId,
+            bakeryId,
+            isActive: true,
+        },
+        select: {
+            id: true,
+            createdById: true,
+        },
+    });
+
+    if (!customer) {
+        throw new NotFoundError("Customer not found in this bakery.");
+    }
+
+    const actor: CustomerActor = {
+        id: session.user.id,
+        role: session.user.role,
+        bakeryId: session.user.bakeryId,
+    };
+
+    const canManageAnyCustomer = actor.role === "ADMIN" || actor.role === "OWNER";
+    if (!canManageAnyCustomer && customer.createdById !== actor.id) {
+        throw new ForbiddenError(
+            action === "update"
+                ? "You are not allowed to update this customer."
+                : "You are not allowed to delete this customer."
+        );
+    }
+
+    return { customer, actor };
 }
 
 async function createCustomer(newCustomerInfo:newCustomerInfo){
@@ -88,42 +138,9 @@ async function getCustomer() {
 }
 
 async function updateCustomer(customerId: number, updateInfo: updateCustomerInfo) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session) {
-        redirect(getLoginRedirectUrl());
-    }
-
-    const bakeryId = parseBakeryId(session.user.bakeryId);
-    if (!bakeryId) {
-        throw new Error("Invalid bakeryId in session");
-    }
-
-    const existingCustomer = await prisma.customer.findFirst({
-        where: {
-            id: customerId,
-            bakeryId,
-            isActive: true,
-        },
-        select: {
-            id: true,
-            createdById: true,
-        },
-    });
-
-    if (!existingCustomer) {
-        throw new Error("Customer not found in this bakery.");
-    }
-
-    const canManageAnyCustomer = session.user.role === "ADMIN" || session.user.role === "OWNER";
-    if (!canManageAnyCustomer && existingCustomer.createdById !== session.user.id) {
-        throw new Error("You are not allowed to update this customer.");
-    }
-
+    const { customer } = await getAuthorizedCustomer(customerId, await headers(), "update");
     return prisma.customer.update({
-        where: { id: customerId },
+        where: { id: customer.id },
         data: {
             name: updateInfo.name,
             phoneNumber: updateInfo.phoneNumber,
@@ -132,42 +149,9 @@ async function updateCustomer(customerId: number, updateInfo: updateCustomerInfo
 }
 
 async function deleteCustomer(customerId: number) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session) {
-        redirect(getLoginRedirectUrl());
-    }
-
-    const bakeryId = parseBakeryId(session.user.bakeryId);
-    if (!bakeryId) {
-        throw new Error("Invalid bakeryId in session");
-    }
-
-    const existingCustomer = await prisma.customer.findFirst({
-        where: {
-            id: customerId,
-            bakeryId,
-            isActive: true,
-        },
-        select: {
-            id: true,
-            createdById: true,
-        },
-    });
-
-    if (!existingCustomer) {
-        throw new Error("Customer not found in this bakery.");
-    }
-
-    const canManageAnyCustomer = session.user.role === "ADMIN" || session.user.role === "OWNER";
-    if (!canManageAnyCustomer && existingCustomer.createdById !== session.user.id) {
-        throw new Error("You are not allowed to delete this customer.");
-    }
-
+    const { customer } = await getAuthorizedCustomer(customerId, await headers(), "delete");
     return prisma.customer.update({
-        where: { id: customerId },
+        where: { id: customer.id },
         data: {
             isActive: false,
         },
