@@ -213,6 +213,19 @@ model OrderProduct {
   @@schema("production")
 }
 
+model BulkBatch {
+  id String @id
+
+  expectedCount Int
+  completedCount Int @default(0)
+  notified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("production")
+}
+
 model Item {
   id        Int     @id @default(autoincrement())
   name      String

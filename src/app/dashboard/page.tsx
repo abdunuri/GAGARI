@@ -51,7 +51,6 @@ const roleCopy = {
         description: "Read-only access to bakery activity and operational summaries.",
         accent: "from-zinc-500 to-zinc-700",
         actions: [
-            { label: "New order", href: "/orders/new" },
             { label: "Browse orders", href: "/orders" },
             { label: "Browse products", href: "/products" },
             { label: "Customers", href: "/customers" },

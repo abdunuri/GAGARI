@@ -43,7 +43,7 @@ export async function PUT(req: Request, context: RouteContext) {
         const customer = await updateCustomer(customerId, {
             name: body.name.trim(),
             phoneNumber: body.phoneNumber.trim(),
-        }, session.user);
+        });
 
         return NextResponse.json({ message: "Customer updated successfully", customer }, { status: 200 });
     } catch (error) {
@@ -67,7 +67,7 @@ export async function DELETE(_req: Request, context: RouteContext) {
             return NextResponse.json({ message: "Invalid customer id." }, { status: 400 });
         }
 
-        await deleteCustomer(customerId, session.user);
+        await deleteCustomer(customerId);
         return NextResponse.json({ message: "Customer deleted successfully" }, { status: 200 });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to delete customer.";

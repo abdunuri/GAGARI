@@ -2,6 +2,7 @@ import {betterAuth} from "better-auth";
 import {prismaAdapter} from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
 import { nextCookies } from "better-auth/next-js";
+import { username } from "better-auth/plugins/username";
 
 function normalizeUrl(value: string | undefined): string | null {
     if (!value) {
@@ -61,5 +62,5 @@ export const auth = betterAuth({
         enabled : true,
         autoSignIn: false,
     },
-    plugins:[nextCookies()]
+    plugins:[nextCookies(),username()],
 });

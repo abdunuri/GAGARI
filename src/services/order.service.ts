@@ -1,10 +1,7 @@
 import { auth } from "@/lib/auth";
+import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { OrderStatus, Prisma } from "@prisma/client";
-import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -18,6 +15,21 @@ type createOrderInput = {
         unitPrice: number;
         quantity: number;
     }[];
+};
+
+type BatchOrderInput = {
+    customerId: number;
+    orderProducts: {
+        productId: number;
+        unitPrice: number;
+        quantity: number;
+    }[];
+};
+
+type CreateOrdersBatchInput = {
+    bulkBatchId: string;
+    bulkExpectedCount: number;
+    orders: BatchOrderInput[];
 };
 
 type updateOrderInput = {
@@ -82,6 +94,7 @@ type OrderListItem = {
     id: string;
     bulkBatchId: string | null;
     status: OrderStatus;
+    createdAt: Date;
     customer: {
         id: number;
         name: string;
@@ -100,6 +113,7 @@ const orderSelect = {
     id: true,
     bulkBatchId: true,
     status: true,
+    createdAt: true,
     customer: {
         select: {
             id: true,
@@ -119,16 +133,6 @@ const orderSelect = {
         },
     },
 } as const;
-
-function getLoginRedirectUrl() {
-    const baseUrl = process.env["BETTER_AUTH_URL"];
-    return baseUrl ? `${baseUrl.replace(/\/$/, "")}/login` : "/login";
-}
-
-function parseBakeryId(bakeryId: string | number | null | undefined) {
-    const parsed = Number(bakeryId);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
 
 function toCents(value: number) {
     return Math.round(value * 100);
@@ -419,79 +423,6 @@ function buildBulkBatchTelegramMessage(tableData: BulkBatchTableData, bulkBatchI
     return lines.join("\n");
 }
 
-function runPythonScript(args: string[]) {
-    return new Promise<void>((resolve, reject) => {
-        const pythonExecutable = process.env["PYTHON_EXECUTABLE"] || "python";
-        const processInstance = spawn(pythonExecutable, args, {
-            stdio: ["ignore", "pipe", "pipe"],
-            windowsHide: true,
-        });
-
-        let stderr = "";
-        processInstance.stderr.on("data", (chunk) => {
-            stderr += String(chunk);
-        });
-
-        processInstance.on("error", (error) => {
-            reject(error);
-        });
-
-        processInstance.on("close", (code) => {
-            if (code === 0) {
-                resolve();
-                return;
-            }
-            reject(new Error(stderr || `Python script failed with code ${code}`));
-        });
-    });
-}
-
-async function renderBulkBatchTableImage(tableData: BulkBatchTableData, bulkBatchId: string) {
-    const scriptPath = path.join(process.cwd(), "scripts", "render_bulk_table_image.py");
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gagari-telegram-"));
-    const payloadPath = path.join(tempDir, "bulk-table-payload.json");
-    const imagePath = path.join(tempDir, `bulk-${bulkBatchId}.png`);
-
-    const payload = {
-        title: "Bulk Order - Customer x Product Quantities",
-        batchId: bulkBatchId,
-        headers: tableData.headers,
-        rows: tableData.rows,
-    };
-
-    await fs.writeFile(payloadPath, JSON.stringify(payload), "utf8");
-    await runPythonScript([scriptPath, payloadPath, imagePath]);
-
-    return {
-        tempDir,
-        imagePath,
-    };
-}
-
-async function sendTelegramBulkPhoto(
-    telegramBotToken: string,
-    chatIds: string[],
-    imagePath: string,
-    caption: string
-) {
-    const imageBuffer = await fs.readFile(imagePath);
-
-    await Promise.allSettled(
-        chatIds.map((chatId) => {
-            const formData = new FormData();
-            formData.append("chat_id", chatId);
-            formData.append("caption", caption);
-            formData.append("parse_mode", "HTML");
-            formData.append("photo", new Blob([imageBuffer], { type: "image/png" }), path.basename(imagePath));
-
-            return fetch(`https://api.telegram.org/bot${telegramBotToken}/sendPhoto`, {
-                method: "POST",
-                body: formData,
-            });
-        })
-    );
-}
-
 async function sendTelegramBulkNotification(order: OrderNotificationPayload) {
     const telegramBotToken = process.env["TELEGRAM_BOT_TOKEN"];
     const chatIds = parseTelegramChatIds();
@@ -523,51 +454,20 @@ async function sendTelegramBulkNotification(order: OrderNotificationPayload) {
     );
 }
 
-async function maybeSendBulkBatchNotification(createdOrder: OrderNotificationPayload, bulkExpectedCount: number) {
-    if (!createdOrder.bulkBatchId || !Number.isInteger(bulkExpectedCount) || bulkExpectedCount <= 0) {
-        return;
-    }
+async function maybeSendBulkBatchNotification(
+    createdOrder: OrderNotificationPayload,
+    bulkExpectedCount: number,
+    completedCountDelta = 1
+) {
+    const bulkBatchId = createdOrder.bulkBatchId;
 
-    const batchOrders = await prisma.order.findMany({
-        where: {
-            bulkBatchId: createdOrder.bulkBatchId,
-            bakeryId: createdOrder.bakeryId,
-        },
-        select: {
-            id: true,
-            createdAt: true,
-            customer: {
-                select: {
-                    name: true,
-                },
-            },
-            orderProducts: {
-                select: {
-                    quantity: true,
-                    product: {
-                        select: {
-                            name: true,
-                        },
-                    },
-                },
-            },
-        },
-        orderBy: [
-            {
-                createdAt: "desc",
-            },
-            {
-                id: "desc",
-            },
-        ],
-    });
-
-    if (batchOrders.length !== bulkExpectedCount) {
-        return;
-    }
-
-    const latestOrder = batchOrders[0];
-    if (!latestOrder || latestOrder.id !== createdOrder.id) {
+    if (
+        !bulkBatchId ||
+        !Number.isInteger(bulkExpectedCount) ||
+        bulkExpectedCount <= 0 ||
+        !Number.isInteger(completedCountDelta) ||
+        completedCountDelta <= 0
+    ) {
         return;
     }
 
@@ -578,49 +478,110 @@ async function maybeSendBulkBatchNotification(createdOrder: OrderNotificationPay
         return;
     }
 
-    const tableData = buildBulkBatchTableData(batchOrders);
-    const textFallbackMessage = buildBulkBatchTelegramMessage(tableData, createdOrder.bulkBatchId, batchOrders.length);
-    const photoCaption = [
-        "<b>Bulk order submitted</b>",
-        `Batch ID: <code>${escapeTelegramHtml(createdOrder.bulkBatchId)}</code>`,
-        `Customers: <b>${batchOrders.length}</b>`,
-        `Total quantity: <b>${tableData.totalQuantity}</b>`,
-    ].join("\n");
-
-    let renderedImagePath: string | null = null;
-    let tempDirToCleanup: string | null = null;
-
-    try {
-        const rendered = await renderBulkBatchTableImage(tableData, createdOrder.bulkBatchId);
-        renderedImagePath = rendered.imagePath;
-        tempDirToCleanup = rendered.tempDir;
-        await sendTelegramBulkPhoto(telegramBotToken, chatIds, renderedImagePath, photoCaption);
-        return;
-    } catch (error) {
-        console.error("Failed to render/send bulk table image, falling back to text", error);
-    } finally {
-        if (tempDirToCleanup) {
-            await fs.rm(tempDirToCleanup, { recursive: true, force: true });
-        }
-    }
-
-    const message = textFallbackMessage;
-
-    await Promise.allSettled(
-        chatIds.map((chatId) =>
-            fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
+    await prisma.$transaction(async (tx) => {
+        const batchUpdate = await tx.bulkBatch.updateMany({
+            where: {
+                id: bulkBatchId,
+                notified: false,
+            },
+            data: {
+                completedCount: {
+                    increment: completedCountDelta,
                 },
-                body: JSON.stringify({
-                    chat_id: chatId,
-                    parse_mode: "HTML",
-                    text: message,
-                }),
-            })
-        )
-    );
+            },
+        });
+
+        if (batchUpdate.count === 0) {
+            return;
+        }
+
+        const batch = await tx.bulkBatch.findUnique({
+            where: {
+                id: bulkBatchId,
+            },
+            select: {
+                completedCount: true,
+                expectedCount: true,
+                notified: true,
+            },
+        });
+
+        if (!batch || batch.notified || batch.completedCount !== batch.expectedCount) {
+            return;
+        }
+
+        const notificationState = await tx.bulkBatch.updateMany({
+            where: {
+                id: bulkBatchId,
+                notified: false,
+                completedCount: batch.completedCount,
+            },
+            data: {
+                notified: true,
+            },
+        });
+
+        if (notificationState.count === 0) {
+            return;
+        }
+
+        const batchOrders = await tx.order.findMany({
+            where: {
+                bulkBatchId,
+                bakeryId: createdOrder.bakeryId,
+            },
+            select: {
+                id: true,
+                createdAt: true,
+                customer: {
+                    select: {
+                        name: true,
+                    },
+                },
+                orderProducts: {
+                    select: {
+                        quantity: true,
+                        product: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: [
+                {
+                    createdAt: "desc",
+                },
+                {
+                    id: "desc",
+                },
+            ],
+        });
+
+        if (batchOrders.length === 0) {
+            return;
+        }
+
+        const tableData = buildBulkBatchTableData(batchOrders);
+        const textFallbackMessage = buildBulkBatchTelegramMessage(tableData, bulkBatchId, batchOrders.length);
+
+        await Promise.allSettled(
+            chatIds.map((chatId) =>
+                fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        parse_mode: "HTML",
+                        text: textFallbackMessage,
+                    }),
+                })
+            )
+        );
+    });
 }
 
 async function createOrder(orderinput: createOrderInput) {
@@ -637,6 +598,21 @@ async function createOrder(orderinput: createOrderInput) {
 
     if (!bakeryId) {
         throw new Error("Your account is not linked to a bakery.");
+    }
+
+    if (orderinput.bulkBatchId && typeof orderinput.bulkExpectedCount === "number") {
+        await prisma.bulkBatch.upsert({
+            where: {
+                id: orderinput.bulkBatchId,
+            },
+            create: {
+                id: orderinput.bulkBatchId,
+                expectedCount: orderinput.bulkExpectedCount,
+            },
+            update: {
+                expectedCount: orderinput.bulkExpectedCount,
+            },
+        });
     }
 
     const customer = await prisma.customer.findFirst({
@@ -695,7 +671,7 @@ async function createOrder(orderinput: createOrderInput) {
     if (order.bulkBatchId) {
         try {
             if (typeof orderinput.bulkExpectedCount === "number") {
-                await maybeSendBulkBatchNotification(order, orderinput.bulkExpectedCount);
+                await maybeSendBulkBatchNotification(order, orderinput.bulkExpectedCount, 1);
             } else {
                 await sendTelegramBulkNotification(order);
             }
@@ -729,6 +705,151 @@ async function createOrder(orderinput: createOrderInput) {
     return order;
     
 };
+
+async function createOrdersBatch(batchInput: CreateOrdersBatchInput) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session) {
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
+    }
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
+    }
+
+    if (!batchInput.bulkBatchId || !Number.isInteger(batchInput.bulkExpectedCount) || batchInput.bulkExpectedCount <= 0) {
+        throw new OrderServiceError("INVALID_PAYLOAD", "Invalid bulk batch metadata.");
+    }
+
+    if (!Array.isArray(batchInput.orders) || batchInput.orders.length === 0) {
+        throw new OrderServiceError("INVALID_PAYLOAD", "At least one order is required.");
+    }
+
+    if (batchInput.orders.length !== batchInput.bulkExpectedCount) {
+        throw new OrderServiceError("INVALID_PAYLOAD", "Bulk order count does not match the submitted orders.");
+    }
+
+    for (const order of batchInput.orders) {
+        if (!Number.isInteger(order.customerId) || order.customerId <= 0) {
+            throw new OrderServiceError("INVALID_PAYLOAD", "Each order must include a valid customer id.");
+        }
+
+        if (!Array.isArray(order.orderProducts) || order.orderProducts.length === 0) {
+            throw new OrderServiceError("INVALID_PAYLOAD", "Each order must include at least one product.");
+        }
+
+        for (const product of order.orderProducts) {
+            if (
+                !Number.isInteger(product.productId) ||
+                product.productId <= 0 ||
+                !Number.isFinite(product.unitPrice) ||
+                product.unitPrice < 0 ||
+                !Number.isInteger(product.quantity) ||
+                product.quantity <= 0
+            ) {
+                throw new OrderServiceError("INVALID_PAYLOAD", "Each product must include valid product, price, and quantity values.");
+            }
+        }
+    }
+
+    await prisma.bulkBatch.upsert({
+        where: {
+            id: batchInput.bulkBatchId,
+        },
+        create: {
+            id: batchInput.bulkBatchId,
+            expectedCount: batchInput.bulkExpectedCount,
+        },
+        update: {
+            expectedCount: batchInput.bulkExpectedCount,
+        },
+    });
+
+    const customerIds = [...new Set(batchInput.orders.map((order) => order.customerId))];
+    const productIds = [...new Set(batchInput.orders.flatMap((order) => order.orderProducts.map((product) => product.productId)))];
+
+    const [customers, products] = await Promise.all([
+        prisma.customer.findMany({
+            where: {
+                id: {
+                    in: customerIds,
+                },
+                bakeryId,
+                isActive: true,
+            },
+            select: {
+                id: true,
+            },
+        }),
+        prisma.product.findMany({
+            where: {
+                id: {
+                    in: productIds,
+                },
+                bakeryId,
+            },
+            select: {
+                id: true,
+            },
+        }),
+    ]);
+
+    if (customers.length !== customerIds.length) {
+        throw new OrderServiceError("NOT_FOUND", "One or more customers were not found in this bakery.");
+    }
+
+    if (products.length !== productIds.length) {
+        throw new OrderServiceError("NOT_ALLOWED", "One or more products do not belong to this bakery.");
+    }
+
+    const createdOrders = await prisma.$transaction(async (tx) => {
+        const results: OrderNotificationPayload[] = [];
+
+        for (const orderInput of batchInput.orders) {
+            const createdOrder = await tx.order.create({
+                data: {
+                    createdById: session.user.id,
+                    bakeryId,
+                    customerId: orderInput.customerId,
+                    bulkBatchId: batchInput.bulkBatchId,
+                    orderProducts: {
+                        create: orderInput.orderProducts.map((product) => ({
+                            productId: product.productId,
+                            unitPrice: product.unitPrice,
+                            quantity: product.quantity,
+                        })),
+                    },
+                },
+                include: {
+                    orderProducts: true,
+                    customer: true,
+                },
+            });
+
+            results.push(createdOrder);
+        }
+
+        return results;
+    });
+
+    const notificationSeedOrder = createdOrders[createdOrders.length - 1];
+    if (notificationSeedOrder) {
+        try {
+            await maybeSendBulkBatchNotification(
+                notificationSeedOrder,
+                batchInput.bulkExpectedCount,
+                createdOrders.length
+            );
+        } catch (error) {
+            console.error("Failed to send bulk order notification", error);
+        }
+    }
+
+    return createdOrders;
+}
 
 async function getOrders(page = 1, pageSize = 20): Promise<OrderListItem[]> {
     const session = await auth.api.getSession({
@@ -1020,4 +1141,4 @@ async function deleteOrder(orderId: string) {
     });
 }
 
-export {createOrder ,getOrders,updateOrder,deleteOrder, OrderServiceError};
+export {createOrder, createOrdersBatch, getOrders, updateOrder, deleteOrder,OrderServiceError};

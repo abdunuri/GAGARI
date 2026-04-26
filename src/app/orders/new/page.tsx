@@ -30,6 +30,11 @@ type NewOrderResponse = {
   order: Order;
 };
 
+type CreateOrdersBatchResponse = {
+  message: string;
+  orders: Order[];
+};
+
 type GetCustomerResponse = {
   message: string;
   customers: Customer[];
@@ -359,50 +364,35 @@ export default function NewOrderPage() {
         return;
       }
 
-      const submissionResults = await Promise.all(
-        rowsToSubmit.map(async (row) => {
-          const res = await fetch("/api/order", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              bulkBatchId,
-              bulkExpectedCount: rowsToSubmit.length,
-              customerId: row.customer.id,
-              orderProducts: [
-                {
-                  productId: selectedBreadProduct.id,
-                  unitPrice: selectedBreadPrice,
-                  quantity: row.quantity,
-                },
-              ],
-            }),
-          });
+      const res = await fetch("/api/order/batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bulkBatchId,
+          bulkExpectedCount: rowsToSubmit.length,
+          orders: rowsToSubmit.map((row) => ({
+            customerId: row.customer.id,
+            orderProducts: [
+              {
+                productId: selectedBreadProduct.id,
+                unitPrice: selectedBreadPrice,
+                quantity: row.quantity,
+              },
+            ],
+          })),
+        }),
+      });
 
-          const data: NewOrderResponse = await res.json();
+      const data: CreateOrdersBatchResponse = await res.json();
 
-          if (!res.ok) {
-            return {
-              ok: false,
-              message: data.message || `Failed for ${row.customer.name}`,
-            } as const;
-          }
-
-          return {
-            ok: true,
-            order: data.order,
-          } as const;
-        })
-      );
-
-      const failedSubmission = submissionResults.find((result) => !result.ok);
-      if (failedSubmission && !failedSubmission.ok) {
-        setMessage(failedSubmission.message);
+      if (!res.ok) {
+        setMessage(data.message || "Failed to create bulk orders");
         return;
       }
 
-      setMessage(`Created ${rowsToSubmit.length} order${rowsToSubmit.length > 1 ? "s" : ""} successfully`);
+      setMessage(data.message || `Created ${rowsToSubmit.length} order${rowsToSubmit.length > 1 ? "s" : ""} successfully`);
       setBulkQuantities((current) => {
         const next = { ...current };
         for (const customer of customers) {

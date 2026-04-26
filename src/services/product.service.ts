@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/client"
 import { headers } from "next/headers";
@@ -15,16 +16,6 @@ type updateProductInput = {
     category: "BREAD" | "FASTF" | "CAKE";
     price: number;
 };
-
-function getLoginRedirectUrl() {
-    const baseUrl = process.env["BETTER_AUTH_URL"];
-    return baseUrl ? `${baseUrl.replace(/\/$/, "")}/login` : "/login";
-}
-
-function parseBakeryId(bakeryId: string | number | null | undefined) {
-    const parsed = Number(bakeryId);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
 
 async function getAuthorizedProduct(productId: number) {
     const session = await auth.api.getSession({
@@ -73,15 +64,9 @@ async function CreateProduct(newProduct:newProduct){
     }
 
     const createdById = session.user.id
-    const rawBakeryId = session.user.bakeryId;
-    const bakeryId = Number.parseInt(String(rawBakeryId), 10);
-
-    if (Number.isNaN(bakeryId)) {
-        console.error("CreateProduct rejected due to invalid bakeryId", {
-            userId: session.user.id,
-            bakeryId: rawBakeryId,
-        });
-        throw new TypeError("Invalid bakeryId in user session");
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new Error("Invalid bakeryId in session");
     }
 
     const product = await prisma.product.create({
