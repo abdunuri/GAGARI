@@ -13,6 +13,12 @@ type updateCustomerInfo = {
     phoneNumber: string;
 }
 
+type CustomerActor = {
+    id: string;
+    role: string | null | undefined;
+    bakeryId?: string | number | null | undefined;
+}
+
 function getLoginRedirectUrl() {
     const baseUrl = process.env["BETTER_AUTH_URL"];
     return baseUrl ? `${baseUrl.replace(/\/$/, "")}/login` : "/login";
@@ -87,16 +93,8 @@ async function getCustomer() {
     return customers
 }
 
-async function updateCustomer(customerId: number, updateInfo: updateCustomerInfo) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session) {
-        redirect(getLoginRedirectUrl());
-    }
-
-    const bakeryId = parseBakeryId(session.user.bakeryId);
+async function updateCustomer(customerId: number, updateInfo: updateCustomerInfo, actor: CustomerActor) {
+    const bakeryId = parseBakeryId(actor.bakeryId);
     if (!bakeryId) {
         throw new Error("Invalid bakeryId in session");
     }
@@ -117,8 +115,8 @@ async function updateCustomer(customerId: number, updateInfo: updateCustomerInfo
         throw new Error("Customer not found in this bakery.");
     }
 
-    const canManageAnyCustomer = session.user.role === "ADMIN" || session.user.role === "OWNER";
-    if (!canManageAnyCustomer && existingCustomer.createdById !== session.user.id) {
+    const canManageAnyCustomer = actor.role === "ADMIN" || actor.role === "OWNER";
+    if (!canManageAnyCustomer && existingCustomer.createdById !== actor.id) {
         throw new Error("You are not allowed to update this customer.");
     }
 
@@ -131,16 +129,8 @@ async function updateCustomer(customerId: number, updateInfo: updateCustomerInfo
     });
 }
 
-async function deleteCustomer(customerId: number) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session) {
-        redirect(getLoginRedirectUrl());
-    }
-
-    const bakeryId = parseBakeryId(session.user.bakeryId);
+async function deleteCustomer(customerId: number, actor: CustomerActor) {
+    const bakeryId = parseBakeryId(actor.bakeryId);
     if (!bakeryId) {
         throw new Error("Invalid bakeryId in session");
     }
@@ -161,8 +151,8 @@ async function deleteCustomer(customerId: number) {
         throw new Error("Customer not found in this bakery.");
     }
 
-    const canManageAnyCustomer = session.user.role === "ADMIN" || session.user.role === "OWNER";
-    if (!canManageAnyCustomer && existingCustomer.createdById !== session.user.id) {
+    const canManageAnyCustomer = actor.role === "ADMIN" || actor.role === "OWNER";
+    if (!canManageAnyCustomer && existingCustomer.createdById !== actor.id) {
         throw new Error("You are not allowed to delete this customer.");
     }
 

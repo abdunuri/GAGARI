@@ -1,4 +1,5 @@
 import { deleteCustomer, updateCustomer } from "@/services/customer.service";
+import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 type RouteContext = {
@@ -12,6 +13,11 @@ function parseCustomerId(id: string) {
 
 export async function PUT(req: Request, context: RouteContext) {
     try {
+        const session = await auth.api.getSession({ headers: req.headers });
+        if (!session) {
+            return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+        }
+
         const { id } = await context.params;
         const customerId = parseCustomerId(id);
 
@@ -37,7 +43,7 @@ export async function PUT(req: Request, context: RouteContext) {
         const customer = await updateCustomer(customerId, {
             name: body.name.trim(),
             phoneNumber: body.phoneNumber.trim(),
-        });
+        }, session.user);
 
         return NextResponse.json({ message: "Customer updated successfully", customer }, { status: 200 });
     } catch (error) {
@@ -49,6 +55,11 @@ export async function PUT(req: Request, context: RouteContext) {
 
 export async function DELETE(_req: Request, context: RouteContext) {
     try {
+        const session = await auth.api.getSession({ headers: _req.headers });
+        if (!session) {
+            return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+        }
+
         const { id } = await context.params;
         const customerId = parseCustomerId(id);
 
@@ -56,7 +67,7 @@ export async function DELETE(_req: Request, context: RouteContext) {
             return NextResponse.json({ message: "Invalid customer id." }, { status: 400 });
         }
 
-        await deleteCustomer(customerId);
+        await deleteCustomer(customerId, session.user);
         return NextResponse.json({ message: "Customer deleted successfully" }, { status: 200 });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to delete customer.";
