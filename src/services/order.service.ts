@@ -27,6 +27,23 @@ type updateOrderInput = {
     quantity?: number;
 };
 
+type OrderServiceErrorCode =
+    | "INVALID_PAYLOAD"
+    | "NOT_FOUND"
+    | "NOT_ALLOWED"
+    | "PRODUCT_NOT_IN_ORDER"
+    | "UNAUTHORIZED";
+
+class OrderServiceError extends Error {
+    code: OrderServiceErrorCode;
+
+    constructor(code: OrderServiceErrorCode, message: string) {
+        super(message);
+        this.name = "OrderServiceError";
+        this.code = code;
+    }
+}
+
 type OrderNotificationPayload = {
     id: string;
     bakeryId: number;
@@ -604,12 +621,12 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     });
 
     if (!session) {
-        redirect(getLoginRedirectUrl());
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
     }
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     if (!bakeryId) {
-        throw new Error("Your account is not linked to a bakery.");
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
     }
 
     const order = await prisma.order.findFirst({
@@ -624,12 +641,12 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     });
 
     if (!order) {
-        throw new Error("Order not found in this bakery.");
+        throw new OrderServiceError("NOT_FOUND", "Order not found in this bakery.");
     }
 
     const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
     if (!canManageAnyOrder && order.createdById !== session.user.id) {
-        throw new Error("You are not allowed to update this order.");
+        throw new OrderServiceError("NOT_ALLOWED", "You are not allowed to update this order.");
     }
 
     const shouldUpdateStatus = typeof updateInput.status !== "undefined";
@@ -638,11 +655,11 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
 
     if (shouldUpdateQuantity) {
         if (typeof updateInput.productId !== "number" || !Number.isInteger(updateInput.productId) || updateInput.productId <= 0) {
-            throw new Error("Product id must be a valid positive integer.");
+            throw new OrderServiceError("INVALID_PAYLOAD", "Product id must be a valid positive integer.");
         }
 
         if (typeof updateInput.quantity !== "number" || !Number.isInteger(updateInput.quantity) || updateInput.quantity <= 0) {
-            throw new Error("Quantity must be a positive integer.");
+            throw new OrderServiceError("INVALID_PAYLOAD", "Quantity must be a positive integer.");
         }
 
         const orderProduct = await prisma.orderProduct.findFirst({
@@ -656,7 +673,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
         });
 
         if (!orderProduct) {
-            throw new Error("Product not found in this order.");
+            throw new OrderServiceError("PRODUCT_NOT_IN_ORDER", "Product not found in this order.");
         }
 
         return prisma.orderProduct.update({
@@ -673,7 +690,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     }
 
     if (!shouldUpdateStatus && !shouldUpdateAmount) {
-        throw new Error("Nothing to update for this order.");
+        throw new OrderServiceError("INVALID_PAYLOAD", "Nothing to update for this order.");
     }
 
     if (!shouldUpdateAmount) {
@@ -689,7 +706,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
 
     const targetTotal = Number(updateInput.totalAmount);
     if (!Number.isFinite(targetTotal) || targetTotal <= 0) {
-        throw new Error("Total amount must be a positive number.");
+        throw new OrderServiceError("INVALID_PAYLOAD", "Total amount must be a positive number.");
     }
 
     const orderWithProducts = await prisma.order.findFirst({
@@ -713,7 +730,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     });
 
     if (!orderWithProducts || orderWithProducts.orderProducts.length === 0) {
-        throw new Error("Order does not have items to update amount.");
+        throw new OrderServiceError("NOT_FOUND", "Order does not have items to update amount.");
     }
 
     const currentTotal = orderWithProducts.orderProducts.reduce(
@@ -722,7 +739,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     );
 
     if (currentTotal <= 0) {
-        throw new Error("Current order total is invalid.");
+        throw new OrderServiceError("INVALID_PAYLOAD", "Current order total is invalid.");
     }
 
     const scale = targetTotal / currentTotal;
@@ -781,12 +798,12 @@ async function deleteOrder(orderId: string) {
     });
 
     if (!session) {
-        redirect(getLoginRedirectUrl());
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
     }
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     if (!bakeryId) {
-        throw new Error("Your account is not linked to a bakery.");
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
     }
 
     const order = await prisma.order.findFirst({
@@ -801,12 +818,12 @@ async function deleteOrder(orderId: string) {
     });
 
     if (!order) {
-        throw new Error("Order not found in this bakery.");
+        throw new OrderServiceError("NOT_FOUND", "Order not found in this bakery.");
     }
 
     const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
     if (!canManageAnyOrder && order.createdById !== session.user.id) {
-        throw new Error("You are not allowed to delete this order.");
+        throw new OrderServiceError("NOT_ALLOWED", "You are not allowed to delete this order.");
     }
 
     return prisma.$transaction(async (tx) => {
@@ -824,4 +841,4 @@ async function deleteOrder(orderId: string) {
     });
 }
 
-export {createOrder ,getOrders,updateOrder,deleteOrder};
+export {createOrder ,getOrders,updateOrder,deleteOrder, OrderServiceError};
