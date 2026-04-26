@@ -87,7 +87,7 @@ export default function NewOrderPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState("1");
+  const [selectedProductId, setSelectedProductId] = useState("");
   const [orderProducts, setOrderProducts] = useState<OrderProductInput[]>([
     { productId: 0, unitPrice: 0, quantity: "" },
   ]);
