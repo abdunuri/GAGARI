@@ -23,22 +23,38 @@ export async function PUT(req: Request, context: RouteContext) {
             return NextResponse.json({ message: "Invalid product id." }, { status: 400 });
         }
 
-        const body = await req.json();
-        if (typeof body.name !== "string" || body.name.trim() === "") {
+        let body: unknown;
+        try {
+            body = await req.json();
+        } catch {
+            return NextResponse.json({ message: "Invalid JSON payload." }, { status: 400 });
+        }
+
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+            return NextResponse.json({ message: "Validation failed: payload must be a JSON object." }, { status: 400 });
+        }
+
+        const { name, category, price } = body as {
+            name?: unknown;
+            category?: unknown;
+            price?: unknown;
+        };
+
+        if (typeof name !== "string" || name.trim() === "") {
             return NextResponse.json(
                 { message: "Validation failed: name must be a non-empty string." },
                 { status: 400 }
             );
         }
 
-        if (!isProductCategory(body.category)) {
+        if (!isProductCategory(category)) {
             return NextResponse.json(
                 { message: "Validation failed: category must be one of BREAD, FASTF, CAKE." },
                 { status: 400 }
             );
         }
 
-        const parsedPrice = typeof body.price === "number" ? body.price : Number(body.price);
+        const parsedPrice = typeof price === "number" ? price : Number(price);
         if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
             return NextResponse.json(
                 { message: "Validation failed: price must be a positive number." },
@@ -47,8 +63,8 @@ export async function PUT(req: Request, context: RouteContext) {
         }
 
         const product = await UpdateProduct(productId, {
-            name: body.name.trim(),
-            category: body.category,
+            name: name.trim(),
+            category,
             price: parsedPrice,
         });
 

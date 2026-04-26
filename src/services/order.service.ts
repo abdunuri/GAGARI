@@ -130,6 +130,167 @@ function parseBakeryId(bakeryId: string | number | null | undefined) {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function toCents(value: number) {
+    return Math.round(value * 100);
+}
+
+function fromCents(value: number) {
+    return Number((value / 100).toFixed(2));
+}
+
+function findUnboundedCoinCombination(denominations: number[], target: number) {
+    const previous = new Array<number | null>(target + 1).fill(null);
+    const usedIndex = new Array<number>(target + 1).fill(-1);
+    previous[0] = 0;
+
+    for (let current = 0; current <= target; current++) {
+        if (current !== 0 && previous[current] === null) {
+            continue;
+        }
+
+        for (let index = 0; index < denominations.length; index++) {
+            const next = current + denominations[index];
+            if (next <= target && previous[next] === null) {
+                previous[next] = current;
+                usedIndex[next] = index;
+            }
+        }
+    }
+
+    if (previous[target] === null) {
+        return null;
+    }
+
+    const counts = new Array(denominations.length).fill(0);
+    let current = target;
+
+    while (current > 0) {
+        const index = usedIndex[current];
+        if (index < 0) {
+            return null;
+        }
+
+        counts[index] += 1;
+        current = previous[current] ?? 0;
+    }
+
+    return counts;
+}
+
+function findBoundedCoinCombination(denominations: number[], limits: number[], target: number) {
+    const memo = new Map<string, number[] | null>();
+
+    const search = (index: number, remaining: number): number[] | null => {
+        if (remaining === 0) {
+            return new Array(denominations.length - index).fill(0);
+        }
+
+        if (index === denominations.length) {
+            return null;
+        }
+
+        const key = `${index}:${remaining}`;
+        if (memo.has(key)) {
+            return memo.get(key) ?? null;
+        }
+
+        const denomination = denominations[index];
+        const maxUse = Math.min(limits[index], Math.floor(remaining / denomination));
+
+        for (let use = maxUse; use >= 0; use--) {
+            const tail = search(index + 1, remaining - use * denomination);
+            if (tail) {
+                const result = [use, ...tail];
+                memo.set(key, result);
+                return result;
+            }
+        }
+
+        memo.set(key, null);
+        return null;
+    };
+
+    return search(0, target);
+}
+
+function rebalanceOrderProductPrices(
+    products: Array<{ id: number; quantity: number; unitPrice: number }>,
+    targetTotal: number
+) {
+    const targetCents = toCents(targetTotal);
+    const priceCents = products.map((product) => toCents(product.unitPrice));
+    const quantities = products.map((product) => product.quantity);
+
+    let currentCents = 0;
+    for (let index = 0; index < products.length; index++) {
+        currentCents += priceCents[index] * quantities[index];
+    }
+
+    let deltaCents = targetCents - currentCents;
+    if (deltaCents === 0) {
+        return products;
+    }
+
+    const adjustments = new Array(products.length).fill(0);
+
+    if (deltaCents > 0) {
+        const positiveCounts = findUnboundedCoinCombination(quantities, deltaCents);
+        if (!positiveCounts) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Unable to reconcile rounded line items with the requested total amount."
+            );
+        }
+
+        for (let index = 0; index < positiveCounts.length; index++) {
+            adjustments[index] += positiveCounts[index];
+        }
+    } else {
+        const negativeTarget = Math.abs(deltaCents);
+        const limits = priceCents.map((priceCent) => Math.max(0, priceCent - 1));
+        const negativeCounts = findBoundedCoinCombination(quantities, limits, negativeTarget);
+        if (!negativeCounts) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Unable to safely reduce rounded line items to the requested total amount."
+            );
+        }
+
+        for (let index = 0; index < negativeCounts.length; index++) {
+            adjustments[index] -= negativeCounts[index];
+        }
+    }
+
+    const adjustedProducts = products.map((product, index) => {
+        const nextPriceCents = priceCents[index] + adjustments[index];
+        if (!Number.isInteger(nextPriceCents) || nextPriceCents <= 0) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Unable to persist a positive unit price after rounding adjustments."
+            );
+        }
+
+        return {
+            ...product,
+            unitPrice: fromCents(nextPriceCents),
+        };
+    });
+
+    const adjustedTotalCents = adjustedProducts.reduce(
+        (sum, product) => sum + toCents(product.unitPrice) * product.quantity,
+        0
+    );
+
+    if (adjustedTotalCents !== targetCents) {
+        throw new OrderServiceError(
+            "INVALID_PAYLOAD",
+            "Unable to reconcile rounded line items with the requested total amount."
+        );
+    }
+
+    return adjustedProducts;
+}
+
 function parseTelegramChatIds() {
     const rawValue = process.env["tg_chat_ids"] ?? process.env["TG_CHAT_IDS"];
 
@@ -654,6 +815,13 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     const shouldUpdateQuantity = typeof updateInput.productId !== "undefined" || typeof updateInput.quantity !== "undefined";
 
     if (shouldUpdateQuantity) {
+        if (shouldUpdateStatus || shouldUpdateAmount) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Quantity updates cannot be combined with status or totalAmount updates."
+            );
+        }
+
         if (typeof updateInput.productId !== "number" || !Number.isInteger(updateInput.productId) || updateInput.productId <= 0) {
             throw new OrderServiceError("INVALID_PAYLOAD", "Product id must be a valid positive integer.");
         }
@@ -757,12 +925,23 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
             .slice(0, lastIndex)
             .reduce((sum, product) => sum + product.unitPrice * product.quantity, 0);
         const lastQuantity = updatedProducts[lastIndex].quantity;
+        if (lastQuantity <= 0) {
+            throw new OrderServiceError(
+                "INVALID_PAYLOAD",
+                "Last order item quantity must be greater than zero before adjusting total amount."
+            );
+        }
+
         const adjustedLastPrice = toTwo((targetTotal - subtotalWithoutLast) / lastQuantity);
-        updatedProducts[lastIndex].unitPrice = adjustedLastPrice > 0 ? adjustedLastPrice : 0.01;
+        if (Number.isFinite(adjustedLastPrice) && adjustedLastPrice > 0) {
+            updatedProducts[lastIndex].unitPrice = adjustedLastPrice;
+        }
     }
 
+    const rebalancedProducts = rebalanceOrderProductPrices(updatedProducts, targetTotal);
+
     return prisma.$transaction(async (tx) => {
-        for (const product of updatedProducts) {
+        for (const product of rebalancedProducts) {
             await tx.orderProduct.update({
                 where: {
                     id: product.id,

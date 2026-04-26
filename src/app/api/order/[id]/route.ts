@@ -62,6 +62,15 @@ export async function PUT(req: Request, context: RouteContext) {
             );
         }
 
+        if ((hasProductId && !hasQuantity) || (hasQuantity && !hasProductId)) {
+            return NextResponse.json(
+                {
+                    message: "Both productId and quantity must be provided together for product updates.",
+                },
+                { status: 400 }
+            );
+        }
+
         if (hasStatus && !isOrderStatus(body["status"])) {
             return NextResponse.json(
                 { message: "Validation failed: status must be one of PENDING, PAID, CANCELLED." },

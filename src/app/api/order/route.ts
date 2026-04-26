@@ -51,6 +51,10 @@ function isClientOrderError(error: unknown) {
     ].includes(error.message);
 }
 
+function isPositiveInteger(value: unknown): value is number {
+    return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
 export async function POST(req:Request) {
     try {
         const body: unknown = await req.json();
@@ -61,10 +65,17 @@ export async function POST(req:Request) {
             );
         }
 
+        if (typeof body.bulkExpectedCount !== "undefined" && !isPositiveInteger(body.bulkExpectedCount)) {
+            return NextResponse.json(
+                { message: "Validation failed: bulkExpectedCount must be a positive integer when provided." },
+                { status: 400 }
+            );
+        }
+
         const order = await createOrder({
             customerId: body.customerId,
             bulkBatchId: typeof body.bulkBatchId === "string" ? body.bulkBatchId : undefined,
-            bulkExpectedCount: typeof body.bulkExpectedCount === "number" ? body.bulkExpectedCount : undefined,
+            bulkExpectedCount: body.bulkExpectedCount,
             orderProducts: body.orderProducts.map((product) => ({
                 productId:product.productId,
                 unitPrice:product.unitPrice,

@@ -84,6 +84,7 @@ export default async function Dashboard(){
 
     const dashboard = roleCopy[role] ?? roleCopy.STAFF;
     const showStats = role === "ADMIN" || role === "OWNER";
+    const canCreateOrder = role !== "VIEWER";
     let recentOrders =  await prisma.order.findMany({
             where: { bakeryId },
             include: { customer: true, orderProducts: true },
@@ -126,12 +127,14 @@ export default async function Dashboard(){
                                     Signed in as <span className="font-medium text-zinc-800">{session.user.name}</span>
                                 </p>
                                 <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-                                    <a
-                                        href="/orders/new"
-                                        className="inline-flex w-full items-center justify-center rounded-full bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 sm:w-auto"
-                                    >
-                                        New Order
-                                    </a>
+                                    {canCreateOrder && (
+                                        <a
+                                            href="/orders/new"
+                                            className="inline-flex w-full items-center justify-center rounded-full bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 sm:w-auto"
+                                        >
+                                            New Order
+                                        </a>
+                                    )}
                                     <a
                                         href="/orders"
                                         className="inline-flex w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 sm:w-auto"

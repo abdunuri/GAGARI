@@ -13,6 +13,22 @@ type GetCustomersResponse = {
   customers: Customer[];
 };
 
+type UpdateCustomerResponse = {
+  message?: string;
+  customer?: {
+    name?: string;
+    phoneNumber?: string;
+  };
+};
+
+async function readJsonResponse<T>(res: Response): Promise<T | null> {
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default function CustomerPage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setPhoneNumber] = useState("");
@@ -74,17 +90,20 @@ export default function CustomerPage() {
           phoneNumber: trimmedPhone,
         }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<UpdateCustomerResponse>(res);
 
       if (!res.ok) {
-        setMessage(data.message || "Failed to update customer");
+        setMessage(data?.message || "Failed to update customer");
         return;
       }
+
+      const nextName = data?.customer?.name ?? trimmedName;
+      const nextPhone = data?.customer?.phoneNumber ?? trimmedPhone;
 
       setCustomers((prev) =>
         prev.map((item) =>
           item.id === customer.id
-            ? { ...item, name: data.customer.name, phoneNumber: data.customer.phoneNumber }
+            ? { ...item, name: nextName, phoneNumber: nextPhone }
             : item
         )
       );

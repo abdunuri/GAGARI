@@ -144,7 +144,6 @@ async function DeleteProduct(productId: number) {
     const orderProductsCount = await prisma.orderProduct.count({
         where: {
             productId,
-            isRemoved: false,
         },
     });
 
