@@ -52,6 +52,15 @@ type GetProductResponse = {
   products: Product[];
 };
 
+type LastDayQuantityResponse = {
+  message: string;
+  quantities: {
+    customerId: number;
+    quantity: number;
+    orderedAt: string;
+  }[];
+};
+
 type Mode = "single" | "bulk";
 
 type BulkDraftOrder = {
@@ -97,8 +106,10 @@ export default function NewOrderPage() {
     { productId: 0, unitPrice: 0, quantity: "" },
   ]);
   const [bulkQuantities, setBulkQuantities] = useState<Record<number, string>>({});
+  const [lastDayQuantities, setLastDayQuantities] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [successPopup, setSuccessPopup] = useState<string | null>(null);
   const [draftInfo, setDraftInfo] = useState<{ savedAt: number; restored: boolean } | null>(null);
   const bulkQuantityRefs = useRef<Array<HTMLInputElement | null>>([]);
   const hasHydratedDraft = useRef(false);
@@ -139,8 +150,29 @@ export default function NewOrderPage() {
       }
     };
 
+    const fetchLastDayQuantities = async () => {
+      try {
+        const res = await fetch("/api/order/last-day-quantities", { method: "GET" });
+        if (!res.ok) {
+          return;
+        }
+
+        const data: LastDayQuantityResponse = await res.json();
+        const next: Record<number, number> = {};
+
+        for (const entry of data.quantities ?? []) {
+          next[entry.customerId] = entry.quantity;
+        }
+
+        setLastDayQuantities(next);
+      } catch {
+        // Placeholder data is optional and should not block order creation.
+      }
+    };
+
     void fetchCustomers();
     void fetchProducts();
+    void fetchLastDayQuantities();
   }, []);
 
   const breadProducts = useMemo(
@@ -183,6 +215,13 @@ export default function NewOrderPage() {
     }
 
     window.localStorage.removeItem(BULK_DRAFT_STORAGE_KEY);
+  };
+
+  const showSuccessPopup = (text: string) => {
+    setSuccessPopup(text);
+    window.setTimeout(() => {
+      setSuccessPopup((current) => (current === text ? null : current));
+    }, 3200);
   };
 
   useEffect(() => {
@@ -334,7 +373,8 @@ export default function NewOrderPage() {
         return;
       }
 
-      setMessage("Order created successfully");
+      setMessage("");
+      showSuccessPopup("Order created successfully.");
       setCustomerId("");
       setOrderProducts([{ productId: 0, unitPrice: 0, quantity: "" }]);
       router.refresh();
@@ -392,7 +432,10 @@ export default function NewOrderPage() {
         return;
       }
 
-      setMessage(data.message || `Created ${rowsToSubmit.length} order${rowsToSubmit.length > 1 ? "s" : ""} successfully`);
+      setMessage("");
+      showSuccessPopup(
+        data.message || `Created ${rowsToSubmit.length} order${rowsToSubmit.length > 1 ? "s" : ""} successfully.`
+      );
       setBulkQuantities((current) => {
         const next = { ...current };
         for (const customer of customers) {
@@ -412,6 +455,30 @@ export default function NewOrderPage() {
 
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-4 text-zinc-900 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+      {successPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/25 px-4">
+          <div className="w-full max-w-2xl rounded-3xl border border-emerald-300 bg-gradient-to-br from-emerald-50 via-emerald-100 to-emerald-200 p-5 shadow-2xl min-h-[25vh] sm:min-h-[11rem] sm:w-[min(88vw,42rem)] sm:p-7">
+            <div className="flex h-full flex-col justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Success</p>
+                <p className="mt-2 text-base font-semibold text-emerald-900 sm:text-lg">{successPopup}</p>
+                <p className="mt-2 text-sm text-emerald-800">The order has been saved and reflected in the latest data.</p>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSuccessPopup(null)}
+                  aria-label="Close success notification"
+                  className="rounded-full border border-emerald-400 bg-white px-4 py-1.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="mx-auto max-w-7xl space-y-4 sm:space-y-5">
         <div className="rounded-3xl border border-zinc-200 bg-white p-2.5 shadow-sm sm:p-3">
           <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
@@ -662,7 +729,11 @@ export default function NewOrderPage() {
                             }))
                           }
                           className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm md:rounded-2xl md:px-4 md:py-3"
-                          placeholder="Enter quantity"
+                          placeholder={
+                            typeof lastDayQuantities[row.customer.id] === "number"
+                              ? `Last day: ${lastDayQuantities[row.customer.id]}`
+                              : "Enter quantity"
+                          }
                         />
                       </div>
                     </div>

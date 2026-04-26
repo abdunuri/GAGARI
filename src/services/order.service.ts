@@ -109,6 +109,12 @@ type OrderListItem = {
     }[];
 };
 
+type CustomerLastDayBulkQuantity = {
+    customerId: number;
+    quantity: number;
+    orderedAt: Date;
+};
+
 const orderSelect = {
     id: true,
     bulkBatchId: true,
@@ -230,7 +236,7 @@ function rebalanceOrderProductPrices(
         currentCents += priceCents[index] * quantities[index];
     }
 
-    let deltaCents = targetCents - currentCents;
+    const deltaCents = targetCents - currentCents;
     if (deltaCents === 0) {
         return products;
     }
@@ -897,6 +903,81 @@ async function getOrders(page = 1, pageSize = 20): Promise<OrderListItem[]> {
     return orders
 };
 
+async function getCustomerLastDayBulkQuantities(): Promise<CustomerLastDayBulkQuantity[]> {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session) {
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
+    }
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
+    }
+
+    const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const orders = await prisma.order.findMany({
+        where: {
+            bakeryId,
+            bulkBatchId: {
+                not: null,
+            },
+            ...(canManageAnyOrder
+                ? {}
+                : {
+                    createdById: session.user.id,
+                }),
+        },
+        select: {
+            customerId: true,
+            createdAt: true,
+            orderProducts: {
+                select: {
+                    quantity: true,
+                },
+            },
+        },
+        orderBy: [
+            {
+                createdAt: "desc",
+            },
+            {
+                id: "desc",
+            },
+        ],
+        take: 5000,
+    });
+
+    const sameDayFallback = new Map<number, CustomerLastDayBulkQuantity>();
+    const previousDayCandidates = new Map<number, CustomerLastDayBulkQuantity>();
+
+    for (const order of orders) {
+        const quantity = order.orderProducts.reduce((sum, item) => sum + item.quantity, 0);
+        const snapshot: CustomerLastDayBulkQuantity = {
+            customerId: order.customerId,
+            quantity,
+            orderedAt: order.createdAt,
+        };
+
+        if (!sameDayFallback.has(order.customerId)) {
+            sameDayFallback.set(order.customerId, snapshot);
+        }
+
+        if (order.createdAt < startOfToday && !previousDayCandidates.has(order.customerId)) {
+            previousDayCandidates.set(order.customerId, snapshot);
+        }
+    }
+
+    return [...sameDayFallback.keys()].map((customerId) => {
+        return previousDayCandidates.get(customerId) ?? sameDayFallback.get(customerId)!;
+    });
+}
+
 async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     const session = await auth.api.getSession({
         headers: await headers(),
@@ -1141,4 +1222,4 @@ async function deleteOrder(orderId: string) {
     });
 }
 
-export {createOrder, createOrdersBatch, getOrders, updateOrder, deleteOrder,OrderServiceError};
+export {createOrder, createOrdersBatch, getOrders, getCustomerLastDayBulkQuantities, updateOrder, deleteOrder,OrderServiceError};

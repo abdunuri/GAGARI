@@ -144,7 +144,7 @@ export default function OrdersAccordion({ groups }: OrdersAccordionProps) {
     const inFlightOrders = useRef(new Set<string>());
 
     const handleDeleteOrder = async (order: Pick<ChildOrder, "id" | "customerName">) => {
-        const shouldDelete = window.confirm(`Delete order for \"${order.customerName}\"?`);
+        const shouldDelete = window.confirm(`Delete order for "${order.customerName}"?`);
         if (!shouldDelete) {
             return;
         }

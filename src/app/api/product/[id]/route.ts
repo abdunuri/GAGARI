@@ -1,4 +1,5 @@
 import { DeleteProduct, UpdateProduct } from "@/services/product.service";
+import { HttpError } from "@/lib/errors";
 import { NextResponse } from "next/server";
 
 type RouteContext = {
@@ -70,9 +71,11 @@ export async function PUT(req: Request, context: RouteContext) {
 
         return NextResponse.json({ message: "Product updated successfully", product }, { status: 200 });
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to update product.";
-        const status = message.includes("not found") ? 404 : message.includes("not allowed") ? 403 : 500;
-        return NextResponse.json({ message }, { status });
+        if (error instanceof HttpError) {
+            return NextResponse.json({ message: error.message }, { status: error.status });
+        }
+
+        return NextResponse.json({ message: "Failed to update product." }, { status: 500 });
     }
 }
 
@@ -88,14 +91,10 @@ export async function DELETE(_req: Request, context: RouteContext) {
         await DeleteProduct(productId);
         return NextResponse.json({ message: "Product deleted successfully" }, { status: 200 });
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to delete product.";
-        const status = message.includes("not found")
-            ? 404
-            : message.includes("not allowed")
-            ? 403
-            : message.includes("cannot be deleted")
-            ? 409
-            : 500;
-        return NextResponse.json({ message }, { status });
+        if (error instanceof HttpError) {
+            return NextResponse.json({ message: error.message }, { status: error.status });
+        }
+
+        return NextResponse.json({ message: "Failed to delete product." }, { status: 500 });
     }
 }

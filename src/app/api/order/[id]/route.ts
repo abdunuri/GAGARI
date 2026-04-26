@@ -1,6 +1,7 @@
 import { deleteOrder, OrderServiceError, updateOrder } from "@/services/order.service";
 import { OrderStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { hasOwn, isJsonObjectBody } from "../validators";
 
 type RouteContext = {
     params: Promise<{ id: string }>;
@@ -8,10 +9,6 @@ type RouteContext = {
 
 function isOrderStatus(value: unknown): value is OrderStatus {
     return value === "PENDING" || value === "PAID" || value === "CANCELLED";
-}
-
-function hasOwn(payload: Record<string, unknown>, key: string) {
-    return Object.prototype.hasOwnProperty.call(payload, key);
 }
 
 function getOrderErrorStatus(error: OrderServiceError) {
@@ -34,26 +31,26 @@ function getOrderErrorStatus(error: OrderServiceError) {
 export async function PUT(req: Request, context: RouteContext) {
     try {
         const { id } = await context.params;
-        let rawBody: unknown;
+        let body: unknown;
         try {
-            rawBody = await req.json();
+            body = await req.json();
         } catch {
             return NextResponse.json({ message: "Invalid JSON payload." }, { status: 400 });
         }
 
-        if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+        if (!isJsonObjectBody(body)) {
             return NextResponse.json(
                 { message: "Validation failed: payload must be a JSON object." },
                 { status: 400 }
             );
         }
 
-        const body = rawBody as Record<string, unknown>;
+        const payload = body;
 
-        const hasStatus = hasOwn(body, "status");
-        const hasTotalAmount = hasOwn(body, "totalAmount");
-        const hasProductId = hasOwn(body, "productId");
-        const hasQuantity = hasOwn(body, "quantity");
+        const hasStatus = hasOwn(payload, "status");
+        const hasTotalAmount = hasOwn(payload, "totalAmount");
+        const hasProductId = hasOwn(payload, "productId");
+        const hasQuantity = hasOwn(payload, "quantity");
 
         if (!hasStatus && !hasTotalAmount && !hasProductId && !hasQuantity) {
             return NextResponse.json(
@@ -71,7 +68,7 @@ export async function PUT(req: Request, context: RouteContext) {
             );
         }
 
-        if (hasStatus && !isOrderStatus(body["status"])) {
+        if (hasStatus && !isOrderStatus(payload["status"])) {
             return NextResponse.json(
                 { message: "Validation failed: status must be one of PENDING, PAID, CANCELLED." },
                 { status: 400 }
@@ -86,11 +83,11 @@ export async function PUT(req: Request, context: RouteContext) {
         } = {};
 
         if (hasStatus) {
-            updatePayload.status = body["status"] as OrderStatus;
+            updatePayload.status = payload["status"] as OrderStatus;
         }
 
         if (hasTotalAmount) {
-            const totalAmountValue = body["totalAmount"];
+            const totalAmountValue = payload["totalAmount"];
             const candidateTotalAmount = typeof totalAmountValue === "number" ? totalAmountValue : Number(totalAmountValue);
             if (!Number.isFinite(candidateTotalAmount) || candidateTotalAmount <= 0) {
                 return NextResponse.json(
@@ -102,7 +99,7 @@ export async function PUT(req: Request, context: RouteContext) {
         }
 
         if (hasProductId) {
-            const productIdValue = body["productId"];
+            const productIdValue = payload["productId"];
             const candidateProductId = typeof productIdValue === "number" ? productIdValue : Number(productIdValue);
             if (!Number.isInteger(candidateProductId) || candidateProductId <= 0) {
                 return NextResponse.json(
@@ -114,7 +111,7 @@ export async function PUT(req: Request, context: RouteContext) {
         }
 
         if (hasQuantity) {
-            const quantityValue = body["quantity"];
+            const quantityValue = payload["quantity"];
             const candidateQuantity = typeof quantityValue === "number" ? quantityValue : Number(quantityValue);
             if (!Number.isInteger(candidateQuantity) || candidateQuantity <= 0) {
                 return NextResponse.json(

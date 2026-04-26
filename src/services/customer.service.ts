@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth"
+import { ForbiddenError, NotFoundError } from "@/lib/errors"
 import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
 import { headers } from "next/headers"
@@ -51,7 +52,7 @@ async function getAuthorizedCustomer(
     });
 
     if (!customer) {
-        throw new Error("Customer not found in this bakery.");
+        throw new NotFoundError("Customer not found in this bakery.");
     }
 
     const actor: CustomerActor = {
@@ -62,7 +63,7 @@ async function getAuthorizedCustomer(
 
     const canManageAnyCustomer = actor.role === "ADMIN" || actor.role === "OWNER";
     if (!canManageAnyCustomer && customer.createdById !== actor.id) {
-        throw new Error(
+        throw new ForbiddenError(
             action === "update"
                 ? "You are not allowed to update this customer."
                 : "You are not allowed to delete this customer."

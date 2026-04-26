@@ -1,5 +1,6 @@
 import { deleteCustomer, updateCustomer } from "@/services/customer.service";
 import { auth } from "@/lib/auth";
+import { HttpError } from "@/lib/errors";
 import { NextResponse } from "next/server";
 
 type RouteContext = {
@@ -47,9 +48,11 @@ export async function PUT(req: Request, context: RouteContext) {
 
         return NextResponse.json({ message: "Customer updated successfully", customer }, { status: 200 });
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to update customer.";
-        const status = message.includes("not found") ? 404 : message.includes("not allowed") ? 403 : 500;
-        return NextResponse.json({ message }, { status });
+        if (error instanceof HttpError) {
+            return NextResponse.json({ message: error.message }, { status: error.status });
+        }
+
+        return NextResponse.json({ message: "Failed to update customer." }, { status: 500 });
     }
 }
 
@@ -70,8 +73,10 @@ export async function DELETE(_req: Request, context: RouteContext) {
         await deleteCustomer(customerId);
         return NextResponse.json({ message: "Customer deleted successfully" }, { status: 200 });
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to delete customer.";
-        const status = message.includes("not found") ? 404 : message.includes("not allowed") ? 403 : 500;
-        return NextResponse.json({ message }, { status });
+        if (error instanceof HttpError) {
+            return NextResponse.json({ message: error.message }, { status: error.status });
+        }
+
+        return NextResponse.json({ message: "Failed to delete customer." }, { status: 500 });
     }
 }

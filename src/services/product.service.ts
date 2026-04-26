@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/client"
@@ -43,12 +44,12 @@ async function getAuthorizedProduct(productId: number) {
     });
 
     if (!product) {
-        throw new Error("Product not found in this bakery.");
+        throw new NotFoundError("Product not found in this bakery.");
     }
 
     const canManageAnyProduct = session.user.role === "ADMIN" || session.user.role === "OWNER";
     if (!canManageAnyProduct && product.createdById !== session.user.id) {
-        throw new Error("You are not allowed to manage this product.");
+        throw new ForbiddenError("You are not allowed to manage this product.");
     }
 
     return product;
@@ -133,7 +134,7 @@ async function DeleteProduct(productId: number) {
     });
 
     if (orderProductsCount > 0) {
-        throw new Error("This product is already used in orders and cannot be deleted.");
+        throw new ConflictError("This product is already used in orders and cannot be deleted.");
     }
 
     return prisma.product.delete({

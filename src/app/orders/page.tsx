@@ -22,6 +22,16 @@ export default async function OrdersPage(){
   const formatBulkDayLabel = (createdAt: Date) =>
     new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(new Date(createdAt));
 
+  const bulkCounts = orders.reduce((counts, order) => {
+    if (!order.bulkBatchId) {
+      return counts;
+    }
+
+    const current = counts.get(order.bulkBatchId) ?? 0;
+    counts.set(order.bulkBatchId, current + 1);
+    return counts;
+  }, new Map<string, number>());
+
   const groupedOrders = Object.values(
     orders.reduce<Record<string, OrderGroup>>((groups, order) => {
       const groupId = order.bulkBatchId ? `bulk:${order.bulkBatchId}` : `single:${order.id}`;
@@ -31,7 +41,7 @@ export default async function OrdersPage(){
           id: groupId,
           isBulk: Boolean(order.bulkBatchId),
           title: order.bulkBatchId
-            ? `Bulk Order (${orders.filter((o) => o.bulkBatchId === order.bulkBatchId).length} orders) • ${formatBulkDayLabel(order.createdAt)}`
+            ? `Bulk Order (${bulkCounts.get(order.bulkBatchId) ?? 0} orders) • ${formatBulkDayLabel(order.createdAt)}`
             : order.customer.name,
           total: 0,
           status: "PENDING",

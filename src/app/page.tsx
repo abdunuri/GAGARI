@@ -73,6 +73,8 @@ export default function Home() {
               alt="Fresh artisan bread on a wooden table"
               width={900}
               height={560}
+              priority
+              sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 28vw"
               className="h-56 w-full rounded-3xl object-cover shadow-lg sm:h-72"
             />
             <Image
@@ -80,6 +82,7 @@ export default function Home() {
               alt="Pastries displayed in a bakery showcase"
               width={900}
               height={560}
+              sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 28vw"
               className="h-56 w-full rounded-3xl object-cover shadow-lg sm:h-72"
             />
             <Image
@@ -87,6 +90,7 @@ export default function Home() {
               alt="Bakery staff preparing dough"
               width={900}
               height={560}
+              sizes="(max-width: 1023px) 100vw, 45vw"
               className="h-56 w-full rounded-3xl object-cover shadow-lg sm:col-span-2 sm:h-72"
             />
           </div>
