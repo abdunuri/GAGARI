@@ -1,4 +1,5 @@
 import { createCustomer,getCustomer } from "@/services/customer.service";
+import { HttpError } from "@/lib/errors";
 import { NextResponse } from "next/server";
 export async function POST(req:Request){
     try {
@@ -28,6 +29,10 @@ export async function POST(req:Request){
             {status:201}
         );
     } catch (error) {
+        if (error instanceof HttpError) {
+            return NextResponse.json({ message: error.message }, { status: error.status });
+        }
+
         console.error("Failed to create customer", error);
         return NextResponse.json(
             { message: "Failed to create customer." },

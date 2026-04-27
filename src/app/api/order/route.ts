@@ -1,4 +1,4 @@
-import { createOrder, getOrders } from "@/services/order.service";
+import { createOrder, getOrders, OrderServiceError } from "@/services/order.service";
 import { NextResponse } from "next/server";
 import { isCreateOrderRequestBody } from "./validators";
 
@@ -16,6 +16,22 @@ function isClientOrderError(error: unknown) {
 
 function isPositiveInteger(value: unknown): value is number {
     return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function getOrderErrorStatus(error: OrderServiceError) {
+    switch (error.code) {
+        case "INVALID_PAYLOAD":
+            return 400;
+        case "UNAUTHORIZED":
+            return 401;
+        case "NOT_ALLOWED":
+            return 403;
+        case "NOT_FOUND":
+        case "PRODUCT_NOT_IN_ORDER":
+            return 404;
+        default:
+            return 500;
+    }
 }
 
 export async function POST(req:Request) {
@@ -51,6 +67,13 @@ export async function POST(req:Request) {
             {status:201}
         );
     } catch (error) {
+        if (error instanceof OrderServiceError) {
+            return NextResponse.json(
+                { message: error.message },
+                { status: getOrderErrorStatus(error) }
+            );
+        }
+
         console.error("unable to create order",error);
         return NextResponse.json(
             {message:error instanceof Error ? error.message : "failed to create the order"},

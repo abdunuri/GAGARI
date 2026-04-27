@@ -56,6 +56,12 @@ class OrderServiceError extends Error {
     }
 }
 
+function assertCanMutateOrders(role: string | null | undefined) {
+    if (role === "VIEWER") {
+        throw new OrderServiceError("NOT_ALLOWED", "Viewers are not allowed to modify orders.");
+    }
+}
+
 type OrderNotificationPayload = {
     id: string;
     bakeryId: number;
@@ -596,8 +602,9 @@ async function createOrder(orderinput: createOrderInput) {
     })
 
     if(!session){
-        redirect(getLoginRedirectUrl());
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
     }
+    assertCanMutateOrders(session.user.role);
 
     const createdById = session.user.id;
     const bakeryId = parseBakeryId(session.user.bakeryId);
@@ -686,22 +693,26 @@ async function createOrder(orderinput: createOrderInput) {
         }
     } else {
         const telegramBotToken = process.env["TELEGRAM_BOT_TOKEN"];
-        const telegramChatId = process.env["TELEGRAM_CHAT_ID"];
-        if (telegramBotToken && telegramChatId) {
+        const chatIds = parseTelegramChatIds();
+        if (telegramBotToken && chatIds.length > 0) {
             const message = buildOrderTelegramMessage(order);
 
             try {
-                await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        chat_id: telegramChatId,
-                        parse_mode: "HTML",
-                        text: message
-                    })
-                });
+                await Promise.allSettled(
+                    chatIds.map((chatId) =>
+                        fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                chat_id: chatId,
+                                parse_mode: "HTML",
+                                text: message
+                            })
+                        })
+                    )
+                );
             } catch (error) {
                 console.error("Failed to send order notification", error);
             }
@@ -720,6 +731,7 @@ async function createOrdersBatch(batchInput: CreateOrdersBatchInput) {
     if (!session) {
         throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
     }
+    assertCanMutateOrders(session.user.role);
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     if (!bakeryId) {
@@ -911,6 +923,7 @@ async function getCustomerLastDayBulkQuantities(): Promise<CustomerLastDayBulkQu
     if (!session) {
         throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
     }
+    assertCanMutateOrders(session.user.role);
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     if (!bakeryId) {
@@ -986,6 +999,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     if (!session) {
         throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
     }
+    assertCanMutateOrders(session.user.role);
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     if (!bakeryId) {

@@ -1,4 +1,5 @@
 import { CreateProduct, GetProducts } from "@/services/product.service";
+import { HttpError } from "@/lib/errors";
 import { NextResponse } from "next/server";
 
 export async function POST(req:Request){
@@ -38,6 +39,10 @@ export async function POST(req:Request){
             {status:201}
         );
     } catch (error) {
+        if (error instanceof HttpError) {
+            return NextResponse.json({ message: error.message }, { status: error.status });
+        }
+
         if (error instanceof SyntaxError) {
             console.error("Invalid JSON payload in product route", error);
             return NextResponse.json(

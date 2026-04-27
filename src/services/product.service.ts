@@ -18,6 +18,12 @@ type updateProductInput = {
     price: number;
 };
 
+function assertCanMutateProducts(role: string | null | undefined) {
+    if (role === "VIEWER") {
+        throw new ForbiddenError("Viewers are not allowed to modify products.");
+    }
+}
+
 async function getAuthorizedProduct(productId: number) {
     const session = await auth.api.getSession({
         headers: await headers(),
@@ -31,6 +37,7 @@ async function getAuthorizedProduct(productId: number) {
     if (!bakeryId) {
         throw new Error("Invalid bakeryId in session");
     }
+    assertCanMutateProducts(session.user.role);
 
     const product = await prisma.product.findFirst({
         where: {
@@ -63,6 +70,7 @@ async function CreateProduct(newProduct:newProduct){
     if(!session){
         redirect(getLoginRedirectUrl())
     }
+    assertCanMutateProducts(session.user.role);
 
     const createdById = session.user.id
     const bakeryId = parseBakeryId(session.user.bakeryId);

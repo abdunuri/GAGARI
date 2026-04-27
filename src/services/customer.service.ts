@@ -21,6 +21,12 @@ type CustomerActor = {
     bakeryId?: string | number | null | undefined;
 }
 
+function assertCanMutateCustomers(role: string | null | undefined) {
+    if (role === "VIEWER") {
+        throw new ForbiddenError("Viewers are not allowed to modify customers.");
+    }
+}
+
 async function getAuthorizedCustomer(
     customerId: number,
     requestHeaders: Awaited<ReturnType<typeof headers>>,
@@ -60,6 +66,7 @@ async function getAuthorizedCustomer(
         role: session.user.role,
         bakeryId: session.user.bakeryId,
     };
+    assertCanMutateCustomers(actor.role);
 
     const canManageAnyCustomer = actor.role === "ADMIN" || actor.role === "OWNER";
     if (!canManageAnyCustomer && customer.createdById !== actor.id) {
@@ -80,6 +87,7 @@ async function createCustomer(newCustomerInfo:newCustomerInfo){
     if(!session){
         console.log("login required")
         redirect(`${process.env["BETTER_AUTH_URL"] ?? ""}/login`)    }
+    assertCanMutateCustomers(session.user.role);
 
     const createdById = session.user.id;
     const bakeryId = Number(session.user.bakeryId);
