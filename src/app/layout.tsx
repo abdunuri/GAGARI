@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GaGari",
-  description: "Manage Bakery Orders with Ease",
+  title: "GaGari Bakery Management Software",
+  description: "Bakery management software for orders, customers, products, and staff workflows.",
 };
 
 export default function RootLayout({

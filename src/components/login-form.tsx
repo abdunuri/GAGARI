@@ -16,15 +16,19 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { SignIn } from "@/server/sign-in"
+import { SignIn, SignInWithUsername } from "@/server/sign-in"
+import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const router = useRouter()
   const [password, setPassword] = useState("")
+  const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
+  const [loginMode, setLoginMode] = useState<"username" | "email">("username")
   const [isLoading, setIsLoading] = useState(false)
   const [signInError, setSignInError] = useState("")
   const [signInSuccess, setSignInSuccess] = useState("")
@@ -45,9 +49,35 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="shadow-sm">
         <CardHeader className="px-5 text-center sm:px-6">
-          <CardTitle className="text-xl">Welcome back</CardTitle>
+          <CardTitle className="text-xl">Bakery staff login</CardTitle>
         </CardHeader>
         <CardContent className="px-5 sm:px-6">
+          <div className="mb-4 rounded-lg border p-1">
+            <div className="grid grid-cols-2 gap-1">
+              <Button
+                type="button"
+                variant={loginMode === "username" ? "default" : "ghost"}
+                onClick={() => {
+                  setLoginMode("username")
+                  setSignInError("")
+                  setSignInSuccess("")
+                }}
+              >
+                Username login
+              </Button>
+              <Button
+                type="button"
+                variant={loginMode === "email" ? "default" : "ghost"}
+                onClick={() => {
+                  setLoginMode("email")
+                  setSignInError("")
+                  setSignInSuccess("")
+                }}
+              >
+                Email login
+              </Button>
+            </div>
+          </div>
           <form
             onSubmit={async (e) => {
               e.preventDefault()
@@ -55,12 +85,18 @@ export function LoginForm({
               setSignInSuccess("")
               setIsLoading(true)
               try {
-                const result = await SignIn(email, password)
+                const result =
+                  loginMode === "username"
+                    ? await SignInWithUsername(username, password)
+                    : await SignIn(email, password)
+
                 if (!result.ok) {
                   setSignInError(result.message)
                   return
                 }
-                setSignInSuccess("Login successful. Redirecting to dashboard...")
+                setSignInSuccess("Login successful. Redirecting to your bakery dashboard...")
+                router.push("/dashboard")
+                router.refresh()
               } catch (error) {
                 const message = error instanceof Error ? error.message : "Failed to sign in. Please try again."
                 setSignInError(message)
@@ -70,17 +106,31 @@ export function LoginForm({
             }}
           >
             <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  placeholder="m@example.com"
-                  required
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </Field>
+              {loginMode === "username" ? (
+                <Field>
+                  <FieldLabel htmlFor="username">Username</FieldLabel>
+                  <Input
+                    id="username"
+                    type="text"
+                    value={username}
+                    placeholder="bakery_username"
+                    required
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </Field>
+              ) : (
+                <Field>
+                  <FieldLabel htmlFor="email">Email</FieldLabel>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    placeholder="staff@gagari.com"
+                    required
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </Field>
+              )}
               <Field>
                 <div className="flex items-center gap-3">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
@@ -88,7 +138,7 @@ export function LoginForm({
                     href="#"
                     className="ml-auto text-sm underline-offset-4 hover:underline"
                   >
-                    Forgot your password?
+                    Forgot bakery password?
                   </a>
                 </div>
                 <Input
@@ -101,7 +151,7 @@ export function LoginForm({
               </Field>
               <Field>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Logging in..." : "Login"}
+                  {isLoading ? "Signing in..." : "Sign in to bakery dashboard"}
                 </Button>
                 {signInError ? (
                   <FieldError className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-red-700">
@@ -117,7 +167,7 @@ export function LoginForm({
                   </FieldDescription>
                 ) : null}
                 <FieldDescription className="text-center">
-                  Please if you don&apos;t have an account, get one from your Bakery Admin.
+                  Ask your bakery admin for an account if you do not have login access yet.
                 </FieldDescription>
               </Field>
             </FieldGroup>
@@ -125,8 +175,8 @@ export function LoginForm({
         </CardContent>
       </Card>
       <FieldDescription className="px-5 text-center sm:px-6">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+        Use your bakery account to continue. <a href="#">Terms of Service</a>{" "}
+        and <a href="#">Privacy Policy</a> still apply.
       </FieldDescription>
     </div>
   )
