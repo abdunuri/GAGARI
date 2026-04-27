@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from "react";
 import CustomerRow from "@/components/customers/customerRow";
+import { getCustomersPageCopy } from "@/lib/i18n/customers";
+import { useClientLocale } from "@/lib/use-client-locale";
 
 type Customer = {
   id: number;
@@ -30,6 +32,9 @@ async function readJsonResponse<T>(res: Response): Promise<T | null> {
 }
 
 export default function CustomerPage() {
+  const locale = useClientLocale();
+  const copy = getCustomersPageCopy(locale);
+
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,13 +51,13 @@ export default function CustomerPage() {
         const data: GetCustomersResponse = await res.json();
 
         if (!res.ok) {
-          setMessage(data.message || "Failed to fetch customers");
+          setMessage(data.message || copy.messages.fetchFailed);
           return;
         }
 
         setCustomers(data.customers);
       } catch {
-        setMessage("Failed to load customers");
+        setMessage(copy.messages.loadFailed);
       }
     };
 
@@ -80,19 +85,19 @@ export default function CustomerPage() {
 
     const trimmedName = editName.trim();
     if (!trimmedName) {
-      setMessage("Customer name cannot be empty.");
+      setMessage(copy.messages.emptyName);
       return;
     }
 
     const trimmedPhone = editPhone.trim();
     if (!trimmedPhone) {
-      setMessage("Phone number cannot be empty.");
+      setMessage(copy.messages.emptyPhone);
       return;
     }
 
     const phoneRegex = /^[+\d][\d\s-]*$/;
     if (!phoneRegex.test(trimmedPhone)) {
-      setMessage("Phone number can include digits, spaces, + and - only.");
+      setMessage(copy.messages.invalidPhone);
       return;
     }
 
@@ -110,7 +115,7 @@ export default function CustomerPage() {
       const data = await readJsonResponse<UpdateCustomerResponse>(res);
 
       if (!res.ok) {
-        setMessage(data?.message || "Failed to update customer");
+        setMessage(data?.message || copy.messages.updateFailed);
         return;
       }
 
@@ -124,15 +129,15 @@ export default function CustomerPage() {
             : item
         )
       );
-      setMessage("Customer updated successfully");
+      setMessage(copy.messages.updateSuccess);
       handleCancelEdit();
     } catch {
-      setMessage("Failed to update customer");
+      setMessage(copy.messages.updateFailed);
     }
   };
 
   const handleDeleteCustomer = async (customer: Pick<Customer, "id" | "name">) => {
-    const shouldDelete = window.confirm(`Delete customer "${customer.name}"?`);
+    const shouldDelete = window.confirm(copy.actions.deleteConfirm.replace("{name}", customer.name));
     if (!shouldDelete) {
       return;
     }
@@ -144,14 +149,14 @@ export default function CustomerPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Failed to delete customer");
+        setMessage(data.message || copy.messages.deleteFailed);
         return;
       }
 
       setCustomers((prev) => prev.filter((item) => item.id !== customer.id));
-      setMessage("Customer deleted successfully");
+      setMessage(copy.messages.deleteSuccess);
     } catch {
-      setMessage("Failed to delete customer");
+      setMessage(copy.messages.deleteFailed);
     }
   };
   
@@ -177,11 +182,11 @@ export default function CustomerPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Something went wrong");
+        setMessage(data.message || copy.messages.generic);
         return;
       }
 
-      setMessage("Customer created successfully");
+      setMessage(copy.messages.createSuccess);
       setCustomers((prev) => [
         ...prev,
         {
@@ -195,7 +200,7 @@ export default function CustomerPage() {
       setPhoneNumber("");
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Failed to create customer"
+        error instanceof Error ? error.message : copy.messages.createFailed
       );
     } finally {
       setLoading(false);
@@ -207,8 +212,8 @@ export default function CustomerPage() {
       <section className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[360px_1fr] xl:grid-cols-[420px_1fr]">
         <div className="space-y-4 lg:sticky lg:top-28 lg:self-start">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">New Customer</h1>
-            <p className="mt-1 text-sm text-zinc-600 sm:text-base">Create a new customer profile.</p>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{copy.title}</h1>
+            <p className="mt-1 text-sm text-zinc-600 sm:text-base">{copy.subtitle}</p>
           </div>
 
           <form
@@ -216,7 +221,7 @@ export default function CustomerPage() {
             className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
           >
             <div>
-              <label htmlFor="customerName" className="mb-1 block text-sm font-medium text-zinc-800">Customer Name</label>
+              <label htmlFor="customerName" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.customerName}</label>
               <input
                 id="customerName"
                 type="text"
@@ -227,7 +232,7 @@ export default function CustomerPage() {
               />
             </div>
             <div>
-              <label htmlFor="customerPhone" className="mb-1 block text-sm font-medium text-zinc-800">Phone Number</label>
+              <label htmlFor="customerPhone" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.phoneNumber}</label>
               <input
                 id="customerPhone"
                 type="text"
@@ -243,7 +248,7 @@ export default function CustomerPage() {
               disabled={loading}
               className="w-full rounded-full bg-zinc-900 px-5 py-3 font-medium text-white disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create customer"}
+              {loading ? copy.actions.creating : copy.actions.create}
             </button>
 
             {message && (
@@ -255,16 +260,16 @@ export default function CustomerPage() {
         <div className="flex flex-col gap-4 sm:gap-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Customers</h2>
-              <p className="text-sm text-zinc-600 sm:text-base">View and manage customers.</p>
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{copy.list.title}</h2>
+              <p className="text-sm text-zinc-600 sm:text-base">{copy.list.subtitle}</p>
           </div>
           </div>
 
           <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
             <div className="grid grid-cols-3 border-b border-zinc-200 bg-zinc-100 px-6 py-4 text-sm font-semibold">
-              <span>Customer Name</span>
-              <span>Phone Number</span>
-              <span className="text-right">Actions</span>
+              <span>{copy.list.columns.customerName}</span>
+              <span>{copy.list.columns.phoneNumber}</span>
+              <span className="text-right">{copy.list.columns.actions}</span>
             </div>
             <div className="divide-y divide-zinc-200">
               {customers.map((customer: Customer) =>{
@@ -290,12 +295,12 @@ export default function CustomerPage() {
             className="w-full max-w-md space-y-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl"
           >
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">Edit Customer</h2>
-              <p className="mt-1 text-sm text-zinc-600">Update name and phone number together.</p>
+              <h2 className="text-xl font-semibold tracking-tight">{copy.actions.edit}</h2>
+              <p className="mt-1 text-sm text-zinc-600">{copy.actions.editSubtitle}</p>
             </div>
 
             <div>
-              <label htmlFor="editCustomerName" className="mb-1 block text-sm font-medium text-zinc-800">Customer Name</label>
+              <label htmlFor="editCustomerName" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.customerName}</label>
               <input
                 id="editCustomerName"
                 type="text"
@@ -307,7 +312,7 @@ export default function CustomerPage() {
             </div>
 
             <div>
-              <label htmlFor="editCustomerPhone" className="mb-1 block text-sm font-medium text-zinc-800">Phone Number</label>
+              <label htmlFor="editCustomerPhone" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.phoneNumber}</label>
               <input
                 id="editCustomerPhone"
                 type="text"
@@ -324,13 +329,13 @@ export default function CustomerPage() {
                 onClick={handleCancelEdit}
                 className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Cancel
+                {copy.actions.cancel}
               </button>
               <button
                 type="submit"
                 className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
               >
-                Save Changes
+                {copy.actions.saveChanges}
               </button>
             </div>
           </form>

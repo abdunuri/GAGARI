@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from "react";
 import ProductRow from "@/components/products/productRows";
+import { getProductsPageCopy } from "@/lib/i18n/products";
+import { useClientLocale } from "@/lib/use-client-locale";
 
 type Product = {
   id: number;
@@ -15,6 +17,9 @@ type GetProductsResponse = {
 };
 
 export default function ProductPage() {
+  const locale = useClientLocale();
+  const copy = getProductsPageCopy(locale);
+
   const [productName, setProductName] = useState("");
   const [productCategory, setProductCategory] = useState("");
   const [productPrice,setProductPrice]  =useState("");
@@ -33,13 +38,13 @@ export default function ProductPage() {
         const data: GetProductsResponse = await res.json();
 
         if (!res.ok) {
-          setMessage(data.message || "Failed to fetch products");
+          setMessage(data.message || copy.messages.fetchFailed);
           return;
         }
 
         setProducts(data.products);
       } catch {
-        setMessage("Failed to load products");
+        setMessage(copy.messages.loadFailed);
       }
     };
 
@@ -69,18 +74,18 @@ export default function ProductPage() {
 
     const trimmedName = editName.trim();
     if (!trimmedName) {
-      setMessage("Product name cannot be empty.");
+      setMessage(copy.messages.emptyName);
       return;
     }
 
     if (editCategory !== "BREAD" && editCategory !== "FASTF" && editCategory !== "CAKE") {
-      setMessage("Category must be BREAD, FASTF, or CAKE.");
+      setMessage(copy.messages.invalidCategory);
       return;
     }
 
     const parsedPrice = Number(editPrice);
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
-      setMessage("Price must be a positive number.");
+      setMessage(copy.messages.invalidPrice);
       return;
     }
 
@@ -99,7 +104,7 @@ export default function ProductPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Failed to update product");
+        setMessage(data.message || copy.messages.updateFailed);
         return;
       }
 
@@ -115,15 +120,15 @@ export default function ProductPage() {
             : item
         )
       );
-      setMessage("Product updated successfully");
+      setMessage(copy.messages.updateSuccess);
       handleCancelEdit();
     } catch {
-      setMessage("Failed to update product");
+      setMessage(copy.messages.updateFailed);
     }
   };
 
   const handleDeleteProduct = async (product: Pick<Product, "id" | "name">) => {
-    const shouldDelete = window.confirm(`Delete product \"${product.name}\"?`);
+    const shouldDelete = window.confirm(copy.actions.deleteConfirm.replace("{name}", product.name));
     if (!shouldDelete) {
       return;
     }
@@ -135,14 +140,14 @@ export default function ProductPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Failed to delete product");
+        setMessage(data.message || copy.messages.deleteFailed);
         return;
       }
 
       setProducts((prev) => prev.filter((item) => item.id !== product.id));
-      setMessage("Product deleted successfully");
+      setMessage(copy.messages.deleteSuccess);
     } catch {
-      setMessage("Failed to delete product");
+      setMessage(copy.messages.deleteFailed);
     }
   };
 
@@ -169,11 +174,11 @@ export default function ProductPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Something went wrong");
+        setMessage(data.message || copy.messages.generic);
         return;
       }
 
-      setMessage("Product created successfully");
+      setMessage(copy.messages.createSuccess);
       setProducts((prev) => [
         ...prev,
         {
@@ -189,7 +194,7 @@ export default function ProductPage() {
       setProductPrice("");
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Failed to create Product"
+        error instanceof Error ? error.message : copy.messages.createFailed
       );
     } finally {
       setLoading(false);
@@ -201,8 +206,8 @@ export default function ProductPage() {
       <section className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[360px_1fr] xl:grid-cols-[420px_1fr]">
         <div className="space-y-4 lg:sticky lg:top-28 lg:self-start">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">New Product</h1>
-            <p className="mt-1 text-sm text-zinc-600 sm:text-base">Add product details to your catalog.</p>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{copy.title}</h1>
+            <p className="mt-1 text-sm text-zinc-600 sm:text-base">{copy.subtitle}</p>
           </div>
 
           <form
@@ -210,7 +215,7 @@ export default function ProductPage() {
             className="space-y-5 rounded-3xl border border-zinc-200/80 bg-white/90 p-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)] backdrop-blur sm:p-6"
           >
             <div>
-              <label htmlFor="productName" className="mb-1 block text-sm font-medium text-zinc-800">Product Name</label>
+              <label htmlFor="productName" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.productName}</label>
               <input
                 id="productName"
                 type="text"
@@ -221,7 +226,7 @@ export default function ProductPage() {
               />
             </div>
             <div>
-              <label htmlFor="productCategory" className="mb-1 block text-sm font-medium text-zinc-800">Category</label>
+              <label htmlFor="productCategory" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.category}</label>
               <select
                 id="productCategory"
                 value={productCategory}
@@ -229,14 +234,14 @@ export default function ProductPage() {
                 className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 outline-none transition focus:border-amber-300 focus:ring-4 focus:ring-amber-100"
                 required
               >
-                <option value="">Select a category</option>
-                <option value="BREAD">Bread</option>
-                <option value="FASTF">Fast Food</option>
-                <option value="CAKE">Cake</option>
+                <option value="">{copy.fields.selectCategory}</option>
+                <option value="BREAD">{copy.fields.bread}</option>
+                <option value="FASTF">{copy.fields.fastFood}</option>
+                <option value="CAKE">{copy.fields.cake}</option>
               </select>
             </div>
             <div>
-              <label htmlFor="productPrice" className="mb-1 block text-sm font-medium text-zinc-800">Price</label>
+              <label htmlFor="productPrice" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.price}</label>
               <input
                 id="productPrice"
                 type="text"
@@ -252,7 +257,7 @@ export default function ProductPage() {
               disabled={loading}
               className="w-full rounded-full bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 px-5 py-3 font-medium text-white shadow-[0_16px_30px_-20px_rgba(24,24,27,0.95)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create Product"}
+              {loading ? copy.actions.creating : copy.actions.create}
             </button>
 
             {message && (
@@ -264,17 +269,17 @@ export default function ProductPage() {
         <div className="flex flex-col gap-4 sm:gap-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Products</h2>
-              <p className="text-sm text-zinc-600 sm:text-base">View and manage products.</p>
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{copy.list.title}</h2>
+              <p className="text-sm text-zinc-600 sm:text-base">{copy.list.subtitle}</p>
           </div>
           </div>
 
           <div className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/90 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)] backdrop-blur">
             <div className="grid grid-cols-4 border-b border-zinc-200 bg-gradient-to-r from-zinc-100 to-zinc-50 px-6 py-4 text-sm font-semibold">
-              <span>Product</span>
-              <span>Category</span>
-              <span>Price</span>
-              <span className="text-right">Actions</span>
+              <span>{copy.list.columns.product}</span>
+              <span>{copy.list.columns.category}</span>
+              <span>{copy.list.columns.price}</span>
+              <span className="text-right">{copy.list.columns.actions}</span>
             </div>
             <div className="divide-y divide-zinc-200">
               {products.map((product: Product) =>{
@@ -301,12 +306,12 @@ export default function ProductPage() {
             className="w-full max-w-md space-y-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl"
           >
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">Edit Product</h2>
-              <p className="mt-1 text-sm text-zinc-600">Update name, category, and price together.</p>
+              <h2 className="text-xl font-semibold tracking-tight">{copy.actions.edit}</h2>
+              <p className="mt-1 text-sm text-zinc-600">{copy.actions.editSubtitle}</p>
             </div>
 
             <div>
-              <label htmlFor="editProductName" className="mb-1 block text-sm font-medium text-zinc-800">Product Name</label>
+              <label htmlFor="editProductName" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.productName}</label>
               <input
                 id="editProductName"
                 type="text"
@@ -318,7 +323,7 @@ export default function ProductPage() {
             </div>
 
             <div>
-              <label htmlFor="editProductCategory" className="mb-1 block text-sm font-medium text-zinc-800">Category</label>
+              <label htmlFor="editProductCategory" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.category}</label>
               <select
                 id="editProductCategory"
                 value={editCategory}
@@ -326,15 +331,15 @@ export default function ProductPage() {
                 className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                 required
               >
-                <option value="">Select a category</option>
-                <option value="BREAD">Bread</option>
-                <option value="FASTF">Fast Food</option>
-                <option value="CAKE">Cake</option>
+                <option value="">{copy.fields.selectCategory}</option>
+                <option value="BREAD">{copy.fields.bread}</option>
+                <option value="FASTF">{copy.fields.fastFood}</option>
+                <option value="CAKE">{copy.fields.cake}</option>
               </select>
             </div>
 
             <div>
-              <label htmlFor="editProductPrice" className="mb-1 block text-sm font-medium text-zinc-800">Price</label>
+              <label htmlFor="editProductPrice" className="mb-1 block text-sm font-medium text-zinc-800">{copy.fields.price}</label>
               <input
                 id="editProductPrice"
                 type="text"
@@ -351,13 +356,13 @@ export default function ProductPage() {
                 onClick={handleCancelEdit}
                 className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Cancel
+                {copy.actions.cancel}
               </button>
               <button
                 type="submit"
                 className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
               >
-                Save Changes
+                {copy.actions.saveChanges}
               </button>
             </div>
           </form>

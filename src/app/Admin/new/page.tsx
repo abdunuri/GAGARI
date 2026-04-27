@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useClientLocale } from "@/lib/use-client-locale";
+import { getAdminNewCopy } from "@/lib/i18n/admin";
 
 type CreateResult = {
 	message: string;
@@ -17,6 +19,9 @@ type CreateResult = {
 };
 
 export default function NewAdminPage() {
+	const locale = useClientLocale();
+	const copy = getAdminNewCopy(locale);
+
 	const [bakeryName, setBakeryName] = useState("");
 	const [ownerName, setOwnerName] = useState("");
 	const [ownerUsername, setOwnerUsername] = useState("");
@@ -57,14 +62,14 @@ export default function NewAdminPage() {
 
 			const data = (await response.json()) as CreateResult;
 			if (!response.ok) {
-				setErrorMessage(data.message || "Failed to create bakery and owner.");
+				setErrorMessage(data.message || copy.createFailed);
 				return;
 			}
 
 			setSuccess(data);
 			resetForm();
 		} catch (error) {
-			setErrorMessage(error instanceof Error ? error.message : "Failed to create bakery and owner.");
+			setErrorMessage(error instanceof Error ? error.message : copy.createFailed);
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -73,27 +78,27 @@ export default function NewAdminPage() {
 	return (
 		<section className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
 			<div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
-				<p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Create Bakery + Owner</p>
-				<h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">New Bakery Account Setup</h1>
+				<p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{copy.tag}</p>
+				<h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">{copy.title}</h1>
 				<p className="mt-2 text-sm text-zinc-600">
-					This single form creates the bakery first, creates the owner with that bakery ID, then links the bakery owner.
+					{copy.subtitle}
 				</p>
 			</div>
 
 			<form onSubmit={onSubmit} className="space-y-6">
 				<div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-					<h2 className="text-lg font-semibold text-zinc-900">Bakery Details</h2>
-					<p className="mt-1 text-sm text-zinc-500">Enter information for the bakery record.</p>
+					<h2 className="text-lg font-semibold text-zinc-900">{copy.bakerySection.title}</h2>
+					<p className="mt-1 text-sm text-zinc-500">{copy.bakerySection.subtitle}</p>
 
 					<div className="mt-4 grid gap-4">
 						<label className="space-y-1.5">
-							<span className="text-sm font-medium text-zinc-700">Bakery Name</span>
+							<span className="text-sm font-medium text-zinc-700">{copy.bakerySection.bakeryName}</span>
 							<input
 								type="text"
 								value={bakeryName}
 								onChange={(event) => setBakeryName(event.target.value)}
 								required
-								placeholder="e.g. Sunrise Bakery"
+								placeholder={copy.bakerySection.bakeryPlaceholder}
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none ring-zinc-900/20 transition focus:border-zinc-900 focus:ring"
 							/>
 						</label>
@@ -101,55 +106,55 @@ export default function NewAdminPage() {
 				</div>
 
 				<div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-					<h2 className="text-lg font-semibold text-zinc-900">Owner Account Details</h2>
-					<p className="mt-1 text-sm text-zinc-500">These details are used to create the owner user account.</p>
+					<h2 className="text-lg font-semibold text-zinc-900">{copy.ownerSection.title}</h2>
+					<p className="mt-1 text-sm text-zinc-500">{copy.ownerSection.subtitle}</p>
 
 					<div className="mt-4 grid gap-4 sm:grid-cols-2">
 						<label className="space-y-1.5 sm:col-span-2">
-							<span className="text-sm font-medium text-zinc-700">Full Name</span>
+							<span className="text-sm font-medium text-zinc-700">{copy.ownerSection.fullName}</span>
 							<input
 								type="text"
 								value={ownerName}
 								onChange={(event) => setOwnerName(event.target.value)}
 								required
-								placeholder="e.g. Hana Tesfaye"
+								placeholder={copy.ownerSection.fullNamePlaceholder}
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none ring-zinc-900/20 transition focus:border-zinc-900 focus:ring"
 							/>
 						</label>
 
 						<label className="space-y-1.5">
-							<span className="text-sm font-medium text-zinc-700">Username</span>
+							<span className="text-sm font-medium text-zinc-700">{copy.ownerSection.username}</span>
 							<input
 								type="text"
 								value={ownerUsername}
 								onChange={(event) => setOwnerUsername(event.target.value)}
 								required
-								placeholder="owner_username"
+								placeholder={copy.ownerSection.usernamePlaceholder}
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none ring-zinc-900/20 transition focus:border-zinc-900 focus:ring"
 							/>
 						</label>
 
 						<label className="space-y-1.5">
-							<span className="text-sm font-medium text-zinc-700">Email</span>
+							<span className="text-sm font-medium text-zinc-700">{copy.ownerSection.email}</span>
 							<input
 								type="email"
 								value={ownerEmail}
 								onChange={(event) => setOwnerEmail(event.target.value)}
 								required
-								placeholder="owner@bakery.com"
+								placeholder={copy.ownerSection.emailPlaceholder}
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none ring-zinc-900/20 transition focus:border-zinc-900 focus:ring"
 							/>
 						</label>
 
 						<label className="space-y-1.5 sm:col-span-2">
-							<span className="text-sm font-medium text-zinc-700">Password</span>
+							<span className="text-sm font-medium text-zinc-700">{copy.ownerSection.password}</span>
 							<input
 								type="password"
 								value={ownerPassword}
 								onChange={(event) => setOwnerPassword(event.target.value)}
 								required
 								minLength={8}
-								placeholder="At least 8 characters"
+								placeholder={copy.ownerSection.passwordPlaceholder}
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none ring-zinc-900/20 transition focus:border-zinc-900 focus:ring"
 							/>
 						</label>
@@ -162,7 +167,7 @@ export default function NewAdminPage() {
 						disabled={isSubmitting}
 						className="inline-flex items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
 					>
-						{isSubmitting ? "Creating..." : "Create Bakery and Owner"}
+						{isSubmitting ? copy.creatingLabel : copy.createLabel}
 					</button>
 
 					{errorMessage ? (
@@ -173,7 +178,11 @@ export default function NewAdminPage() {
 						<div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
 							<p className="font-semibold">{success.message}</p>
 							<p className="mt-1">
-								Bakery #{success.bakery?.id} ({success.bakery?.name}) linked to owner {success.owner?.name} ({success.owner?.email}).
+								{copy.successLine
+									.replace("{id}", String(success.bakery?.id ?? ""))
+									.replace("{name}", success.bakery?.name ?? "")
+									.replace("{ownerName}", success.owner?.name ?? "")
+									.replace("{ownerEmail}", success.owner?.email ?? "")}
 							</p>
 						</div>
 					) : null}

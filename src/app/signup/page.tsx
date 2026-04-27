@@ -3,13 +3,19 @@ import { prisma } from "@/lib/prisma"
 import { SignupForm } from "@/components/signup-form"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { LayoutBottomIcon } from "@hugeicons/core-free-icons"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
+import { getSignupPageCopy } from "@/lib/i18n/auth-pages"
+import { localeCookieName, resolveLocale } from "@/lib/locales"
 
 type SignupContext = "BOOTSTRAP" | "SYSTEM_ADMIN" | "OWNER"
 
 export const dynamic = "force-dynamic"
 
 export default async function SignupPage() {
+  const cookieStore = await cookies()
+  const locale = resolveLocale(cookieStore.get(localeCookieName)?.value)
+  const copy = getSignupPageCopy(locale)
+
   let userCount = 1
   try {
     userCount = await prisma.user.count()
@@ -38,7 +44,7 @@ export default async function SignupPage() {
           <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <HugeiconsIcon icon={LayoutBottomIcon} strokeWidth={2} className="size-4" />
           </div>
-          GaGari Plc
+          {copy.brand}
         </a>
         <SignupForm currentUserRole={currentUserRole} currentBakeryId={currentBakeryId} />
       </div>

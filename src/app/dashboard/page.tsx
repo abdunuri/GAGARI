@@ -2,64 +2,18 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import StaffBulkOrdersModal from "@/components/dashboard/StaffBulkOrdersModal";
 import { headers } from "next/headers"
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-
-const roleCopy = {
-    SYSTEM_ADMIN: {
-        title: "System Admin Dashboard",
-        description: "Manage platform-wide settings, bakeries, and privileged accounts.",
-        accent: "from-violet-500 to-indigo-600",
-        actions: [
-            { label: "New order", href: "/orders/new" },
-            { label: "Manage customers", href: "/customers" },
-            { label: "Review orders", href: "/orders" },
-            { label: "Add products", href: "/products" },
-        ],
-    },
-    ADMIN: {
-        title: "Admin Dashboard",
-        description: "Oversee the bakery, manage staff workflows, and monitor activity.",
-        accent: "from-emerald-500 to-teal-500",
-        actions: [
-            { label: "New order", href: "/orders/new" },
-            { label: "Manage customers", href: "/customers" },
-            { label: "Review orders", href: "/orders" },
-            { label: "Add products", href: "/products" },
-        ],
-    },
-    OWNER: {
-        title: "Owner Dashboard",
-        description: "Track the full bakery business with a quick view of operations.",
-        accent: "from-sky-500 to-cyan-500",
-        actions: [
-            { label: "New order", href: "/orders/new" },
-            { label: "Manage inventory", href: "/products" },
-            { label: "View customers", href: "/customers" },
-        ],
-    },
-    STAFF: {
-        title: "Staff Dashboard",
-        description: "Handle daily order processing and customer support tasks.",
-        accent: "from-amber-500 to-orange-500",
-        actions: [
-            { label: "New order", href: "/orders/new" },
-            { label: "Open orders", href: "/orders" },
-            { label: "Customers", href: "/customers" },
-        ],
-    },
-    VIEWER: {
-        title: "Viewer Dashboard",
-        description: "Read-only access to bakery activity and operational summaries.",
-        accent: "from-zinc-500 to-zinc-700",
-        actions: [
-            { label: "Browse orders", href: "/orders" },
-            { label: "Browse products", href: "/products" },
-            { label: "Customers", href: "/customers" },
-        ],
-    },
-} as const;
+import { getDashboardCopy, getRoleCopy } from "@/lib/i18n/dashboard";
+import { localeCookieName, localeToIntl, resolveLocale } from "@/lib/locales";
 
 export default async function Dashboard(){
+    const cookieStore = await cookies();
+    const locale = resolveLocale(cookieStore.get(localeCookieName)?.value);
+    const copy = getDashboardCopy(locale);
+    const roleCopy = getRoleCopy(locale);
+    const localeDate = localeToIntl(locale);
+
     let session = null
     try {
         session = await auth.api.getSession({
@@ -198,12 +152,12 @@ export default async function Dashboard(){
             const total = orders.reduce((sum, order) => sum + order.total, 0);
             const uniqueStatuses = Array.from(new Set(orders.map((order) => order.status)));
             const status = (uniqueStatuses.length === 1 ? uniqueStatuses[0] : "MIXED") as "PENDING" | "PAID" | "CANCELLED" | "MIXED";
-            const dayLabel = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(new Date(latestBulkBatch.createdAt));
+            const dayLabel = new Intl.DateTimeFormat(localeDate, { weekday: "long" }).format(new Date(latestBulkBatch.createdAt));
 
             return {
                 id: `bulk:${latestBulkBatch.bulkBatchId}`,
                 isBulk: true,
-                title: `Bulk Order (${orders.length} orders) • ${dayLabel}`,
+                title: `${copy.bulk.titlePrefix} (${orders.length} ${copy.bulk.titleSuffix}) • ${dayLabel}`,
                 total,
                 status,
                 orders,
@@ -213,12 +167,10 @@ export default async function Dashboard(){
         
 
 
-    const stats = [
-        { label: "Customers", value: customerCount, hint: "Active bakery customers" },
-        { label: "Products", value: productCount, hint: "Catalog entries" },
-        { label: "Orders", value: orderCount, hint: "All orders" },
-        { label: "Pending", value: pendingCount, hint: "Needs attention" },
-    ];
+    const stats = copy.stats.map((stat, index) => ({
+        ...stat,
+        value: [customerCount, productCount, orderCount, pendingCount][index],
+    }));
 
     return(
         <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6 lg:px-8">
@@ -228,12 +180,12 @@ export default async function Dashboard(){
                         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                             <div className="space-y-3">
                                 <span className="inline-flex w-fit rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white">
-                                    {session.user.role}
+                                    {copy.roleLabels[role as keyof typeof copy.roleLabels] ?? session.user.role}
                                 </span>
                                 <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">{dashboard.title}</h1>
                                 <p className="max-w-2xl text-sm text-zinc-600 sm:text-base lg:text-lg">{dashboard.description}</p>
                                 <p className="text-sm text-zinc-500">
-                                    Signed in as <span className="font-medium text-zinc-800">{session.user.name}</span>
+                                    {copy.signedInAs} <span className="font-medium text-zinc-800">{session.user.name}</span>
                                 </p>
                                 <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                                     {canCreateOrder && (
@@ -241,17 +193,17 @@ export default async function Dashboard(){
                                             href="/orders/new"
                                             className="inline-flex w-full items-center justify-center rounded-full bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 sm:w-auto"
                                         >
-                                            New Order
+                                            {dashboard.actions.find((action) => action.href === "/orders/new")?.label ?? copy.newOrderFallback}
                                         </a>
                                     )}
                                     <a
                                         href="/orders"
                                         className="inline-flex w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 sm:w-auto"
                                     >
-                                        View Orders
+                                        {copy.viewOrders}
                                     </a>
                                     {role === "STAFF" && (
-                                        <StaffBulkOrdersModal group={latestBulkGroup} />
+                                        <StaffBulkOrdersModal group={latestBulkGroup} locale={locale} />
                                     )}
                                 </div>
                             </div>
@@ -275,8 +227,8 @@ export default async function Dashboard(){
                     <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
                         <div className="flex items-center justify-between gap-4">
                             <div>
-                                <h2 className="text-lg font-semibold sm:text-xl">Quick actions</h2>
-                                <p className="text-sm text-zinc-500">Common tasks for your role.</p>
+                                <h2 className="text-lg font-semibold sm:text-xl">{copy.quickActions}</h2>
+                                <p className="text-sm text-zinc-500">{copy.quickActionsDescription}</p>
                             </div>
                         </div>
 
@@ -292,9 +244,7 @@ export default async function Dashboard(){
                                 const descriptionClass = isPrimary
                                     ? "mt-2 text-sm text-zinc-200"
                                     : "mt-2 text-sm text-zinc-500";
-                                const descriptionText = isPrimary
-                                    ? "Start a new order immediately."
-                                    : "Open the workflow for this task.";
+                                const descriptionText = isPrimary ? copy.primaryAction : copy.secondaryAction;
 
                                 return (
                                     <a
@@ -313,8 +263,8 @@ export default async function Dashboard(){
                     <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-semibold sm:text-xl">Recent orders</h2>
-                                <p className="text-sm text-zinc-500">Latest activity in this bakery.</p>
+                                <h2 className="text-lg font-semibold sm:text-xl">{copy.recentOrders}</h2>
+                                <p className="text-sm text-zinc-500">{copy.recentOrdersDescription}</p>
                             </div>
                         </div>
 
@@ -323,7 +273,7 @@ export default async function Dashboard(){
                                 <div key={order.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
-                                            <p className="text-sm text-zinc-500">{order.customer?.name ?? "Unknown"}</p>
+                                            <p className="text-sm text-zinc-500">{order.customer?.name ?? copy.unknownCustomer}</p>
                                         </div>
                                         <span
                                             className={
@@ -334,11 +284,11 @@ export default async function Dashboard(){
                                                         : "rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700"
                                             }
                                         >
-                                            {order.status}
+                                            {copy.statusLabels[order.status as keyof typeof copy.statusLabels] ?? order.status}
                                         </span>
                                     </div>
                                     <p className="mt-2 text-xs text-zinc-500">
-                                        Created on {new Date(order.createdAt).toLocaleDateString()}
+                                        {copy.createdOn} {new Date(order.createdAt).toLocaleDateString(localeDate)}
                                     </p>
                                 </div>
                             ))}                        </div>

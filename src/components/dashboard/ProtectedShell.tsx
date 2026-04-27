@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import SignOutButton from "@/components/dashboard/SignOutButton";
 import { GetBakeryById } from "@/services/bakery.service";
+import { cookies } from "next/headers";
+import LanguageToggle from "@/components/language-toggle";
+import { localeCookieName, resolveLocale } from "@/lib/locales";
+import { getShellCopy } from "@/lib/i18n/shell";
 
 type Bakery = Awaited<ReturnType<typeof GetBakeryById>>;
 export default async function ProtectedShell({
@@ -11,6 +15,9 @@ export default async function ProtectedShell({
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const locale = resolveLocale(cookieStore.get(localeCookieName)?.value);
+  const chrome = getShellCopy(locale);
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -28,13 +35,12 @@ export default async function ProtectedShell({
               <Link href="/" className="text-xl font-semibold tracking-tight sm:text-2xl lg:text-xl">
                 {await GetBakeryById(Number(session.user.bakeryId))?.then((bakery: Bakery) => bakery?.name) || "Bakery Dashboard"} Bakery
               </Link>
-              <p className="max-w-sm text-xs text-zinc-500 sm:text-sm lg:max-w-none lg:text-xs">
-                Bakery operations built for mobile-first teams.
-              </p>
+              <p className="max-w-sm text-xs text-zinc-500 sm:text-sm lg:max-w-none lg:text-xs">{chrome.subtitle}</p>
             </div>
 
             <div className="flex items-center gap-2 lg:hidden">
-              <SignOutButton />
+              <LanguageToggle locale={locale} />
+              <SignOutButton label={chrome.signOut} />
             </div>
           </div>
 
@@ -43,40 +49,41 @@ export default async function ProtectedShell({
               href="/dashboard"
               className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-900 hover:text-white lg:px-4 lg:py-1.5"
             >
-              Dashboard
+              {chrome.nav.dashboard}
             </Link>
             <Link
               href="/customers"
               className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-900 hover:text-white lg:px-4 lg:py-1.5"
             >
-              Customers
+              {chrome.nav.customers}
             </Link>
             <Link
               href="/products"
               className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-900 hover:text-white lg:px-4 lg:py-1.5"
             >
-              Products
+              {chrome.nav.products}
             </Link>
             <Link
               href="/orders"
               className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-900 hover:text-white lg:px-4 lg:py-1.5"
             >
-              Orders
+              {chrome.nav.orders}
             </Link>
             <Link
               href="/orders/new"
               className="shrink-0 rounded-full border border-zinc-900 bg-zinc-900 px-4 py-2 font-semibold text-white transition hover:bg-zinc-700 lg:px-4 lg:py-1.5"
             >
-              New Order
+              {chrome.nav.newOrder}
             </Link>
           </nav>
 
           <div className="hidden items-center justify-end gap-3 lg:flex">
+            <LanguageToggle locale={locale} />
             <div className="flex flex-col items-end leading-tight">
               <span className="text-sm font-medium text-zinc-900">{session.user.name}</span>
               <span className="text-xs uppercase tracking-[0.16em] text-zinc-500">{session.user.role}</span>
             </div>
-            <SignOutButton />
+            <SignOutButton label={chrome.signOut} />
           </div>
 
         </div>

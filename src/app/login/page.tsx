@@ -1,11 +1,17 @@
 import { auth } from "@/lib/auth"
 import { LoginForm } from "@/components/login-form"
 import Image from "next/image"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import { getLoginPageCopy } from "@/lib/i18n/auth-pages"
+import { localeCookieName, resolveLocale } from "@/lib/locales"
 
 export default async function LoginPage() {
+  const cookieStore = await cookies()
+  const locale = resolveLocale(cookieStore.get(localeCookieName)?.value)
+  const copy = getLoginPageCopy(locale)
+
   let session = null
   try {
     session = await auth.api.getSession({
@@ -34,7 +40,7 @@ export default async function LoginPage() {
             height={36}
             className="size-9 rounded-full object-cover shadow-sm"
           />
-          <span className="text-base font-semibold tracking-tight">GaGari Bakery</span>
+          <span className="text-base font-semibold tracking-tight">{copy.brand}</span>
         </Link>
         <LoginForm />
       </div>

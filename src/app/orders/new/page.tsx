@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getNewOrderPageCopy } from "@/lib/i18n/new-order";
+import { useClientLocale } from "@/lib/use-client-locale";
 
 type OrderProductInput = {
   productId: number;
@@ -97,6 +99,8 @@ function createBulkBatchId() {
 
 export default function NewOrderPage() {
   const router = useRouter();
+  const locale = useClientLocale();
+  const copy = getNewOrderPageCopy(locale);
   const [activeMode, setActiveMode] = useState<Mode>("bulk");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
@@ -131,7 +135,7 @@ export default function NewOrderPage() {
           return next;
         });
       } catch {
-        setMessage("Failed to load customers");
+        setMessage(copy.messages.loadCustomersFailed);
       }
     };
 
@@ -146,7 +150,7 @@ export default function NewOrderPage() {
           setSelectedProductId((current) => current || String(breadProducts[0].id));
         }
       } catch {
-        setMessage("Failed to load products");
+        setMessage(copy.messages.loadProductsFailed);
       }
     };
 
@@ -351,7 +355,7 @@ export default function NewOrderPage() {
       }));
 
       if (normalizedOrderProducts.some((product) => product.quantity <= 0)) {
-        setMessage("Please enter quantity greater than 0 for all products");
+        setMessage(copy.messages.quantityGreaterThanZero);
         return;
       }
 
@@ -369,17 +373,17 @@ export default function NewOrderPage() {
       const data: NewOrderResponse = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Something went wrong");
+        setMessage(data.message || copy.messages.generic);
         return;
       }
 
       setMessage("");
-      showSuccessPopup("Order created successfully.");
+      showSuccessPopup(copy.success.created);
       setCustomerId("");
       setOrderProducts([{ productId: 0, unitPrice: 0, quantity: "" }]);
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to create order");
+      setMessage(error instanceof Error ? error.message : copy.messages.createOrderFailed);
     } finally {
       setLoading(false);
     }
@@ -392,7 +396,7 @@ export default function NewOrderPage() {
 
     try {
       if (!selectedBreadProduct) {
-        setMessage("Select a bread product first");
+        setMessage(copy.messages.selectBreadFirst);
         return;
       }
 
@@ -400,7 +404,7 @@ export default function NewOrderPage() {
       const bulkBatchId = createBulkBatchId();
 
       if (rowsToSubmit.length === 0) {
-        setMessage("Enter at least one customer quantity");
+        setMessage(copy.messages.atLeastOneCustomer);
         return;
       }
 
@@ -428,13 +432,14 @@ export default function NewOrderPage() {
       const data: CreateOrdersBatchResponse = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Failed to create bulk orders");
+        setMessage(data.message || copy.messages.createBulkFailed);
         return;
       }
 
       setMessage("");
       showSuccessPopup(
-        data.message || `Created ${rowsToSubmit.length} order${rowsToSubmit.length > 1 ? "s" : ""} successfully.`
+        data.message || (rowsToSubmit.length > 1 ? copy.success.bulkCreatedPlural : copy.success.bulkCreatedSingle)
+          .replace("{count}", String(rowsToSubmit.length))
       );
       setBulkQuantities((current) => {
         const next = { ...current };
@@ -447,7 +452,7 @@ export default function NewOrderPage() {
       setDraftInfo(null);
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to create bulk orders");
+      setMessage(error instanceof Error ? error.message : copy.messages.createBulkFailed);
     } finally {
       setLoading(false);
     }
@@ -460,18 +465,18 @@ export default function NewOrderPage() {
           <div className="w-full max-w-2xl rounded-3xl border border-emerald-300 bg-gradient-to-br from-emerald-50 via-emerald-100 to-emerald-200 p-5 shadow-2xl min-h-[25vh] sm:min-h-[11rem] sm:w-[min(88vw,42rem)] sm:p-7">
             <div className="flex h-full flex-col justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Success</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">{copy.success.title}</p>
                 <p className="mt-2 text-base font-semibold text-emerald-900 sm:text-lg">{successPopup}</p>
-                <p className="mt-2 text-sm text-emerald-800">The order has been saved and reflected in the latest data.</p>
+                <p className="mt-2 text-sm text-emerald-800">{copy.success.description}</p>
               </div>
               <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={() => setSuccessPopup(null)}
-                  aria-label="Close success notification"
+                  aria-label={copy.success.closeAria}
                   className="rounded-full border border-emerald-400 bg-white px-4 py-1.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
                 >
-                  Close
+                  {copy.success.close}
                 </button>
               </div>
             </div>
@@ -491,7 +496,7 @@ export default function NewOrderPage() {
                   : "rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-white sm:px-4 sm:py-3 sm:text-sm"
               }
             >
-              Bread by Customer
+              {copy.tabs.bulk}
             </button>
             <button
               type="button"
@@ -502,7 +507,7 @@ export default function NewOrderPage() {
                   : "rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-white sm:px-4 sm:py-3 sm:text-sm"
               }
             >
-              Single Order
+              {copy.tabs.single}
             </button>
           </div>
         </div>
@@ -520,19 +525,19 @@ export default function NewOrderPage() {
               className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
             >
               <div>
-                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">New Order</h1>
-                <p className="mt-1 text-sm text-zinc-600 sm:text-base">Create a standard customer order.</p>
+                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{copy.single.title}</h1>
+                <p className="mt-1 text-sm text-zinc-600 sm:text-base">{copy.single.subtitle}</p>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-800">Customer</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-800">{copy.single.customer}</label>
                 <select
                   value={customerId}
                   onChange={(e) => setCustomerId(e.target.value)}
                   className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                   required
                 >
-                  <option value="">Select Customer</option>
+                  <option value="">{copy.single.selectCustomer}</option>
                   {customers.map((customer) => (
                     <option key={customer.id} value={customer.id}>
                       {customer.name}
@@ -542,7 +547,7 @@ export default function NewOrderPage() {
               </div>
 
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-zinc-900">Order Products</h2>
+                <h2 className="text-lg font-semibold text-zinc-900">{copy.single.products}</h2>
 
                 {orderProducts.map((product, index) => (
                   <div
@@ -560,7 +565,7 @@ export default function NewOrderPage() {
                         handleProductChange(index, "unitPrice", selectedProduct ? Number(selectedProduct.price) : 0);
                       }}
                     >
-                      <option value="">Select Product</option>
+                      <option value="">{copy.single.selectProduct}</option>
                       {products.map((productOption) => (
                         <option key={productOption.id} value={productOption.id}>
                           {productOption.name} ({productOption.price})
@@ -569,7 +574,7 @@ export default function NewOrderPage() {
                     </select>
                     <input
                       type="number"
-                      placeholder="Enter quantity"
+                      placeholder={copy.single.quantityPlaceholder}
                       value={product.quantity}
                       onChange={(e) =>
                         handleProductChange(index, "quantity", e.target.value)
@@ -610,7 +615,7 @@ export default function NewOrderPage() {
                   onClick={addProduct}
                   className="w-full rounded-full bg-zinc-900 px-4 py-3 font-medium text-white sm:w-auto"
                 >
-                  Add Product
+                  {copy.single.addProduct}
                 </button>
               </div>
 
@@ -619,20 +624,20 @@ export default function NewOrderPage() {
                 disabled={loading}
                 className="w-full rounded-full bg-zinc-900 px-5 py-3 font-medium text-white disabled:opacity-50"
               >
-                {loading ? "Creating..." : "Create Order"}
+                {loading ? copy.single.creating : copy.single.create}
               </button>
             </form>
 
             <aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Order Summary</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{copy.single.summary}</p>
                 <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">${singleOrderTotal.toFixed(2)}</p>
-                <p className="mt-1 text-sm text-zinc-600">Estimated total for the current product selection.</p>
+                <p className="mt-1 text-sm text-zinc-600">{copy.single.summaryHint}</p>
               </div>
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Products Count</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{copy.single.count}</p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">{orderProducts.length}</p>
-                <p className="mt-1 text-sm text-zinc-600">Update quantities before final submission.</p>
+                <p className="mt-1 text-sm text-zinc-600">{copy.single.countHint}</p>
               </div>
             </aside>
           </div>
@@ -647,7 +652,7 @@ export default function NewOrderPage() {
               {draftInfo && (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 sm:text-sm">
                   <p>
-                    {draftInfo.restored ? "Draft restored." : "Draft saved."} Last update: {new Date(draftInfo.savedAt).toLocaleTimeString()}.
+                    {draftInfo.restored ? copy.bulk.draftRestored : copy.bulk.draftSaved} {copy.bulk.lastUpdate}: {new Date(draftInfo.savedAt).toLocaleTimeString()}.
                   </p>
                   <button
                     type="button"
@@ -659,20 +664,20 @@ export default function NewOrderPage() {
                     }}
                     className="rounded-full border border-zinc-300 bg-white px-3 py-1 font-medium text-zinc-700 hover:border-zinc-400 hover:bg-zinc-100"
                   >
-                    Discard Draft
+                    {copy.bulk.discardDraft}
                   </button>
                 </div>
               )}
 
               <div hidden>
-                <label className="mb-1 block text-sm font-medium text-zinc-800">Bread Product</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-800">{copy.bulk.breadProduct}</label>
                 <select
                   value={selectedProductId}
                   onChange={(e) => setSelectedProductId(e.target.value)}
                   className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
                   required
                 >
-                  <option value="">Select Bread Product</option>
+                  <option value="">{copy.bulk.selectBread}</option>
                   {breadProducts.map((bread) => (
                     <option key={bread.id} value={bread.id}>
                       {bread.name} ({bread.price})
@@ -680,14 +685,14 @@ export default function NewOrderPage() {
                   ))}
                 </select>
                 <p className="mt-2 text-xs text-zinc-500">
-                  Only products in the BREAD category are shown here.
+                  {copy.bulk.breadHint}
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg font-semibold text-zinc-900">Customers</h3>
-                  <p className="text-sm text-zinc-500">Enter quantity only</p>
+                  <h3 className="text-lg font-semibold text-zinc-900">{copy.bulk.customers}</h3>
+                  <p className="text-sm text-zinc-500">{copy.bulk.quantityOnly}</p>
                 </div>
 
                 <div className="space-y-3">
@@ -704,7 +709,7 @@ export default function NewOrderPage() {
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500 md:hidden">Quantity</label>
+                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500 md:hidden">{copy.bulk.quantity}</label>
                         <input
                           ref={(element) => {
                             bulkQuantityRefs.current[index] = element;
@@ -731,8 +736,8 @@ export default function NewOrderPage() {
                           className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm md:rounded-2xl md:px-4 md:py-3"
                           placeholder={
                             typeof lastDayQuantities[row.customer.id] === "number"
-                              ? `Last day: ${lastDayQuantities[row.customer.id]}`
-                              : "Enter quantity"
+                              ? copy.bulk.lastDayPlaceholder.replace("{value}", String(lastDayQuantities[row.customer.id]))
+                              : copy.bulk.quantityPlaceholder
                           }
                         />
                       </div>
@@ -746,28 +751,28 @@ export default function NewOrderPage() {
                 disabled={loading}
                 className="w-full rounded-full bg-zinc-900 px-5 py-3 font-medium text-white disabled:opacity-50"
               >
-                {loading ? "Creating..." : "Create Bulk Orders"}
+                {loading ? copy.bulk.creating : copy.bulk.create}
               </button>
             </form>
 
             <aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Bulk Total</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{copy.bulk.totalLabel}</p>
                 <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">{bulkTotal}</p>
-                <p className="mt-1 text-sm text-zinc-600">Total</p>
+                <p className="mt-1 text-sm text-zinc-600">{copy.bulk.totalHint}</p>
               </div>
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Active Customers</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{copy.bulk.activeCustomers}</p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">{bulkOrderCount}</p>
-                <p className="mt-1 text-sm text-zinc-600">Customers with quantity greater than zero.</p>
+                <p className="mt-1 text-sm text-zinc-600">{copy.bulk.activeCustomersHint}</p>
               </div>
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Selected Bread</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{copy.bulk.selectedBread}</p>
                 <p className="mt-2 text-lg font-semibold text-zinc-900">
-                  {selectedBreadProduct ? selectedBreadProduct.name : "No bread selected"}
+                  {selectedBreadProduct ? selectedBreadProduct.name : copy.bulk.noBreadSelected}
                 </p>
                 <p className="mt-1 text-sm text-zinc-600">
-                  {selectedBreadProduct ? `Unit price: $${selectedBreadPrice.toFixed(2)}` : "Choose a bread product to continue."}
+                  {selectedBreadProduct ? `${copy.bulk.unitPrice}: $${selectedBreadPrice.toFixed(2)}` : copy.bulk.chooseBread}
                 </p>
               </div>
             </aside>

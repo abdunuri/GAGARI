@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import OrdersAccordion from "@/components/orders/ordersAccordion";
+import { getDashboardCopy } from "@/lib/i18n/dashboard";
+import type { Locale } from "@/lib/locales";
 
 type OrderItem = {
     id: number;
@@ -30,6 +32,7 @@ type OrderGroup = {
 
 type StaffBulkOrdersModalProps = {
     group: OrderGroup | null;
+    locale: Locale;
 };
 
 function toSafeNumber(value: string) {
@@ -37,7 +40,8 @@ function toSafeNumber(value: string) {
     return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export default function StaffBulkOrdersModal({ group }: StaffBulkOrdersModalProps) {
+export default function StaffBulkOrdersModal({ group, locale }: StaffBulkOrdersModalProps) {
+    const copy = getDashboardCopy(locale).staffBulkModal;
     const [open, setOpen] = useState(false);
     const [loadedQuantity, setLoadedQuantity] = useState("");
     const [quantityLeft, setQuantityLeft] = useState("");
@@ -83,19 +87,19 @@ export default function StaffBulkOrdersModal({ group }: StaffBulkOrdersModalProp
 
     const analysisText = useMemo(() => {
         if (!group) {
-            return "No bulk batch found yet. Create a bulk order from the new order page to start tracking van cash and quantities.";
+            return copy.analysis.noBulk;
         }
 
         if (summary.loaded <= 0) {
-            return "Add loaded bread and left bread to track current cash in van.";
+            return copy.analysis.enterQuantities;
         }
 
         if (summary.left > summary.loaded) {
-            return "Left bread cannot be greater than loaded bread. Check the entered values.";
+            return copy.analysis.invalidLeft;
         }
 
-        return `All orders are treated as delivered. Collected cash depends on which customers are toggled as PAID.`;
-    }, [group, summary.left, summary.loaded]);
+        return copy.analysis.normal;
+    }, [copy.analysis.enterQuantities, copy.analysis.invalidLeft, copy.analysis.noBulk, copy.analysis.normal, group, summary.left, summary.loaded]);
 
     return (
         <>
@@ -105,7 +109,7 @@ export default function StaffBulkOrdersModal({ group }: StaffBulkOrdersModalProp
                 onClick={() => setOpen(true)}
                 className="inline-flex w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-                Latest Bulk Run
+                {copy.trigger}
             </button>
 
             {open && (
@@ -113,9 +117,9 @@ export default function StaffBulkOrdersModal({ group }: StaffBulkOrdersModalProp
                     <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl border border-zinc-200 bg-white p-4 shadow-2xl sm:p-6">
                         <div className="mb-4 flex items-start justify-between gap-4">
                             <div>
-                                <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl">Latest Bulk Batch</h2>
+                                <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl">{copy.title}</h2>
                                 <p className="mt-1 text-sm text-zinc-600">
-                                    Staff view for one latest created bulk order with payment and delivery tracking.
+                                    {copy.subtitle}
                                 </p>
                             </div>
                             <button
@@ -123,86 +127,85 @@ export default function StaffBulkOrdersModal({ group }: StaffBulkOrdersModalProp
                                 onClick={() => setOpen(false)}
                                 className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50"
                             >
-                                Close
+                                {copy.close}
                             </button>
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Total Expected Money</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{copy.cards.expectedMoney}</p>
                                 <p className="mt-2 text-2xl font-semibold text-zinc-900">${summary.expectedMoney.toFixed(2)}</p>
                             </div>
                             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Total Collected</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{copy.cards.collected}</p>
                                 <p className="mt-2 text-2xl font-semibold text-emerald-700">${summary.collectedMoney.toFixed(2)}</p>
                             </div>
                             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">Total Remaining</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">{copy.cards.remaining}</p>
                                 <p className="mt-2 text-2xl font-semibold text-amber-700">${summary.remainingMoney.toFixed(2)}</p>
                             </div>
                             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Paid Customers</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{copy.cards.paidCustomers}</p>
                                 <p className="mt-2 text-2xl font-semibold text-zinc-900">
                                     {summary.paidCustomersCount}/{summary.totalCustomersCount}
                                 </p>
                             </div>
-                            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:col-span-2 xl:col-span-2">
-                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">Cash Gap To Target</p>
-                                <p className="mt-2 text-2xl font-semibold text-rose-700">${summary.cashGapToTarget.toFixed(2)}</p>
-                                <p className="mt-1 text-xs text-rose-700">
-                                    Gap between Current Cash In Van and Real Money In Hand.
-                                </p>
-                            </div>
+                            
                         </div>
 
                         <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4">
-                            <h3 className="text-base font-semibold text-zinc-900">Van Quantity Analysis</h3>
+                            <h3 className="text-base font-semibold text-zinc-900">{copy.van.title}</h3>
                             <p className="mt-1 text-sm text-zinc-600">
-                                Enter loaded and left bread quantities to get current cash in van from quantity difference and unit price.
+                                {copy.van.subtitle}
                             </p>
 
                             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 <label className="block">
-                                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">Loaded Product (Bread)</span>
+                                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">{copy.van.loadedProduct}</span>
                                     <input
                                         type="number"
                                         min={0}
                                         value={loadedQuantity}
                                         onChange={(e) => setLoadedQuantity(e.target.value)}
                                         className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                                        placeholder="0"
+                                        placeholder={copy.van.emptyPlaceholder}
                                     />
                                 </label>
                                 <label className="block">
-                                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">Left Bread</span>
+                                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">{copy.van.leftBread}</span>
                                     <input
                                         type="number"
                                         min={0}
                                         value={quantityLeft}
                                         onChange={(e) => setQuantityLeft(e.target.value)}
                                         className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                                        placeholder="0"
+                                        placeholder={copy.van.emptyPlaceholder}
                                     />
                                 </label>
+                                
                                 <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">Delivered</p>
-                                    <p className="mt-1 text-lg font-semibold text-zinc-900">{summary.delivered}</p>
-                                </div>
-                                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">Current Cash In Van</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">{copy.van.currentCashInVan}</p>
                                     <p className="mt-1 text-lg font-semibold text-zinc-900">${summary.currentCashInVan.toFixed(2)}</p>
                                 </div>
-                                <label className="block sm:col-span-2 lg:col-span-4">
-                                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">Real Money In Hand (Current)</span>
+                                <label className="block">
+                                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">{copy.van.realMoneyInHand}</span>
                                     <input
                                         type="number"
                                         min={0}
                                         value={moneyInHand}
                                         onChange={(e) => setMoneyInHand(e.target.value)}
                                         className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                                        placeholder="0"
+                                        placeholder={copy.van.emptyPlaceholder}
                                     />
+                                    
                                 </label>
+                                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:col-span-2 xl:col-span-2">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">{copy.cards.cashGap}</p>
+                                    <p className="mt-2 text-2xl font-semibold text-rose-700">${summary.cashGapToTarget.toFixed(2)}</p>
+                                    <p className="mt-1 text-xs text-rose-700">
+                                        {copy.cards.cashGapHint}
+                                    </p>
+                                </div>
                             </div>
 
                             <p className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
@@ -215,7 +218,7 @@ export default function StaffBulkOrdersModal({ group }: StaffBulkOrdersModalProp
                                 <OrdersAccordion groups={[group]} />
                             ) : (
                                 <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                                    No bulk orders found for your current scope.
+                                    {copy.emptyState}
                                 </div>
                             )}
                         </div>
