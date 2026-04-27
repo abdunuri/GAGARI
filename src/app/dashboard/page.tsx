@@ -167,9 +167,16 @@ export default async function Dashboard(){
         
 
 
-    const stats = copy.stats.map((stat, index) => ({
+    const statValueMap = {
+        customers: customerCount,
+        products: productCount,
+        orders: orderCount,
+        pending: pendingCount,
+    } satisfies Record<(typeof copy.stats)[number]["key"], number>;
+
+    const stats = copy.stats.map((stat) => ({
         ...stat,
-        value: [customerCount, productCount, orderCount, pendingCount][index],
+        value: statValueMap[stat.key] ?? 0,
     }));
 
     return(

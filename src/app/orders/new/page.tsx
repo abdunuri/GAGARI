@@ -101,6 +101,8 @@ export default function NewOrderPage() {
   const router = useRouter();
   const locale = useClientLocale();
   const copy = getNewOrderPageCopy(locale);
+  const loadCustomersFailedMessage = copy.messages.loadCustomersFailed;
+  const loadProductsFailedMessage = copy.messages.loadProductsFailed;
   const [activeMode, setActiveMode] = useState<Mode>("bulk");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
@@ -135,7 +137,7 @@ export default function NewOrderPage() {
           return next;
         });
       } catch {
-        setMessage(copy.messages.loadCustomersFailed);
+        setMessage(loadCustomersFailedMessage);
       }
     };
 
@@ -150,7 +152,7 @@ export default function NewOrderPage() {
           setSelectedProductId((current) => current || String(breadProducts[0].id));
         }
       } catch {
-        setMessage(copy.messages.loadProductsFailed);
+        setMessage(loadProductsFailedMessage);
       }
     };
 
@@ -177,7 +179,7 @@ export default function NewOrderPage() {
     void fetchCustomers();
     void fetchProducts();
     void fetchLastDayQuantities();
-  }, []);
+  }, [loadCustomersFailedMessage, loadProductsFailedMessage]);
 
   const breadProducts = useMemo(
     () => products.filter((product) => product.category === "BREAD"),

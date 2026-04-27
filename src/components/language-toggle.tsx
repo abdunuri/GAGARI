@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { localeCookieName, supportedLocales, type Locale } from "@/lib/locales";
+import { supportedLocales, type Locale } from "@/lib/locales";
 
 const localeLabels: Record<Locale, string> = {
   en: "English",
@@ -32,9 +32,19 @@ export default function LanguageToggle({ locale, size = "default" }: LanguageTog
       return;
     }
 
-    document.cookie = `${localeCookieName}=${nextLocale}; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax`;
     startTransition(() => {
-      router.refresh();
+      void fetch("/api/locale", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          locale: nextLocale,
+          maxAge: COOKIE_MAX_AGE,
+        }),
+      }).finally(() => {
+        router.refresh();
+      });
     });
   };
 

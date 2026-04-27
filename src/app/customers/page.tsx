@@ -34,6 +34,8 @@ async function readJsonResponse<T>(res: Response): Promise<T | null> {
 export default function CustomerPage() {
   const locale = useClientLocale();
   const copy = getCustomersPageCopy(locale);
+  const fetchFailedMessage = copy.messages.fetchFailed;
+  const loadFailedMessage = copy.messages.loadFailed;
 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setPhoneNumber] = useState("");
@@ -51,18 +53,18 @@ export default function CustomerPage() {
         const data: GetCustomersResponse = await res.json();
 
         if (!res.ok) {
-          setMessage(data.message || copy.messages.fetchFailed);
+          setMessage(data.message || fetchFailedMessage);
           return;
         }
 
         setCustomers(data.customers);
       } catch {
-        setMessage(copy.messages.loadFailed);
+        setMessage(loadFailedMessage);
       }
     };
 
     void loadCustomers();
-  }, []);
+  }, [fetchFailedMessage, loadFailedMessage]);
 
   const handleEditCustomer = (customer: Customer) => {
     setEditingCustomer(customer);
@@ -95,7 +97,7 @@ export default function CustomerPage() {
       return;
     }
 
-    const phoneRegex = /^[+\d][\d\s-]*$/;
+    const phoneRegex = /^\+?(?:[\s-]*\d){2,}[\d\s-]*$/;
     if (!phoneRegex.test(trimmedPhone)) {
       setMessage(copy.messages.invalidPhone);
       return;

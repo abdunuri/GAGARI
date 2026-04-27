@@ -14,10 +14,10 @@ export const dashboardCopy = {
     viewOrders: "View Orders",
     newOrderFallback: "New Order",
     stats: [
-      { label: "Customers", hint: "Active bakery customers" },
-      { label: "Products", hint: "Catalog entries" },
-      { label: "Orders", hint: "All orders" },
-      { label: "Pending", hint: "Needs attention" },
+      { key: "customers", label: "Customers", hint: "Active bakery customers" },
+      { key: "products", label: "Products", hint: "Catalog entries" },
+      { key: "orders", label: "Orders", hint: "All orders" },
+      { key: "pending", label: "Pending", hint: "Needs attention" },
     ],
     roleLabels: {
       SYSTEM_ADMIN: "System Admin",
@@ -81,10 +81,10 @@ export const dashboardCopy = {
     viewOrders: "ትዕዛዞችን ይመልከቱ",
     newOrderFallback: "አዲስ ትዕዛዝ",
     stats: [
-      { label: "ደንበኞች", hint: "በንቃት ያሉ ደንበኞች" },
-      { label: "ምርቶች", hint: "የካታሎግ መዝገቦች" },
-      { label: "ትዕዛዞች", hint: "ሁሉም ትዕዛዞች" },
-      { label: "በመጠባበቅ", hint: "ትኩረት የሚፈልጉ" },
+      { key: "customers", label: "ደንበኞች", hint: "በንቃት ያሉ ደንበኞች" },
+      { key: "products", label: "ምርቶች", hint: "የካታሎግ መዝገቦች" },
+      { key: "orders", label: "ትዕዛዞች", hint: "ሁሉም ትዕዛዞች" },
+      { key: "pending", label: "በመጠባበቅ", hint: "ትኩረት የሚፈልጉ" },
     ],
     roleLabels: {
       SYSTEM_ADMIN: "የስርዓት አስተዳዳሪ",

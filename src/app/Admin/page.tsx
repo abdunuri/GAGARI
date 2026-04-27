@@ -65,9 +65,18 @@ export default async function AdminPage() {
 		}),
 	]);
 
-	const statCards = copy.stats.map((stat, index) => ({
+	const statValueMap = {
+		bakeries: totalBakeries,
+		orders: totalOrders,
+		pendingOrders: totalPendingOrders,
+		products: totalProducts,
+		customers: totalCustomers,
+		owners: totalOwners,
+	} satisfies Record<(typeof copy.stats)[number]["key"], number>;
+
+	const statCards = copy.stats.map((stat) => ({
 		...stat,
-		value: [totalBakeries, totalOrders, totalPendingOrders, totalProducts, totalCustomers, totalOwners][index],
+		value: statValueMap[stat.key] ?? 0,
 	}));
 
 	return (

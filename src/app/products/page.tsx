@@ -19,6 +19,8 @@ type GetProductsResponse = {
 export default function ProductPage() {
   const locale = useClientLocale();
   const copy = getProductsPageCopy(locale);
+  const fetchFailedMessage = copy.messages.fetchFailed;
+  const loadFailedMessage = copy.messages.loadFailed;
 
   const [productName, setProductName] = useState("");
   const [productCategory, setProductCategory] = useState("");
@@ -38,18 +40,18 @@ export default function ProductPage() {
         const data: GetProductsResponse = await res.json();
 
         if (!res.ok) {
-          setMessage(data.message || copy.messages.fetchFailed);
+          setMessage(data.message || fetchFailedMessage);
           return;
         }
 
         setProducts(data.products);
       } catch {
-        setMessage(copy.messages.loadFailed);
+        setMessage(loadFailedMessage);
       }
     };
 
     void loadProducts();
-  }, []);
+  }, [fetchFailedMessage, loadFailedMessage]);
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);

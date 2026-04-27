@@ -25,6 +25,10 @@ export async function proxy(request: NextRequest) {
         return NextResponse.next();
     }
 
+    if (pathname === "/api/locale") {
+        return NextResponse.next();
+    }
+
     if (PUBLIC_PATHS.includes(pathname)) {
         return NextResponse.next();
     }

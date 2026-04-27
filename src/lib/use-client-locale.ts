@@ -1,19 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { resolveLocaleFromCookieString, type Locale } from "@/lib/locales";
 
+const subscribe = () => {
+  return () => {};
+};
+
 export function useClientLocale(fallback: Locale = "am") {
-  // Keep the initial render deterministic to avoid hydration mismatch.
-  const [locale, setLocale] = useState<Locale>(fallback);
+  return useSyncExternalStore(
+    subscribe,
+    () => {
+      if (typeof document === "undefined") {
+        return fallback;
+      }
 
-  useEffect(() => {
-    if (typeof document === "undefined") {
-      return;
-    }
-
-    setLocale(resolveLocaleFromCookieString(document.cookie, fallback));
-  }, [fallback]);
-
-  return locale;
+      return resolveLocaleFromCookieString(document.cookie, fallback);
+    },
+    () => fallback
+  );
 }
