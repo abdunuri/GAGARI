@@ -72,8 +72,8 @@ export const landingCopy = {
       description:
         "For bakery software demos, onboarding help, or questions about managing your bakery, reach out to our team.",
       details: [
-        "Email: hello@gagari.com",
-        "Phone: +251 900 000 000",
+        "Email: riseandshineup495@gmail.com",
+        "Phone: +251 951 676 784",
         "Address: Addis Ababa, Ethiopia",
       ],
       supportHoursTitle: "Bakery Support Hours",
@@ -165,8 +165,8 @@ export const landingCopy = {
       description:
         "ለቤኬሪ ሶፍትዌር ማሳያዎች፣ ለመጀመሪያ ማዋቀር እገዛ ወይም ቤኬሪዎን ስለማስተዳደር ጥያቄዎች ከቡድናችን ጋር ይገናኙ።",
       details: [
-        "ኢሜይል: hello@gagari.com",
-        "ስልክ: +251 900 000 000",
+        "ኢሜይል: riseandshineup495@gmail.com",
+        "ስልክ: +251 951 676 784",
         "አድራሻ: Addis Ababa, Ethiopia",
       ],
       supportHoursTitle: "የቤኬሪ ድጋፍ ሰዓታት",
