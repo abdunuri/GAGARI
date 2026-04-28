@@ -1,13 +1,13 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import SignOutButton from "@/components/dashboard/SignOutButton";
+import MobileDashboardMenu from "@/components/dashboard/MobileDashboardMenu";
 import { GetBakeryById } from "@/services/bakery.service";
 import { cookies } from "next/headers";
 import LanguageToggle from "@/components/language-toggle";
 import { localeCookieName, resolveLocale } from "@/lib/locales";
 import { getShellCopy } from "@/lib/i18n/shell";
+import { getCurrentSession } from "@/lib/auth-session";
 
 type Bakery = Awaited<ReturnType<typeof GetBakeryById>>;
 export default async function ProtectedShell({
@@ -18,9 +18,7 @@ export default async function ProtectedShell({
   const cookieStore = await cookies();
   const locale = resolveLocale(cookieStore.get(localeCookieName)?.value);
   const chrome = getShellCopy(locale);
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const session = await getCurrentSession();
 
   if (!session) {
     redirect("/login");
@@ -38,13 +36,10 @@ export default async function ProtectedShell({
               <p className="max-w-sm text-xs text-zinc-500 sm:text-sm lg:max-w-none lg:text-xs">{chrome.subtitle}</p>
             </div>
 
-            <div className="flex items-center gap-2 lg:hidden">
-              <LanguageToggle locale={locale} />
-              <SignOutButton label={chrome.signOut} />
-            </div>
+            <MobileDashboardMenu locale={locale} role={session.user.role} signOutLabel={chrome.signOut} nav={chrome.nav} />
           </div>
 
-          <nav className="flex items-center gap-2 overflow-x-auto pb-1 text-sm text-zinc-600 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:justify-center lg:overflow-visible lg:pb-0">
+          <nav className="hidden items-center gap-2 overflow-x-auto pb-1 text-sm text-zinc-600 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex lg:justify-center lg:overflow-visible lg:pb-0">
             <Link
               href="/dashboard"
               className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-900 hover:text-white lg:px-4 lg:py-1.5"
@@ -85,7 +80,6 @@ export default async function ProtectedShell({
             </div>
             <SignOutButton label={chrome.signOut} />
           </div>
-
         </div>
       </header>
 

@@ -26,7 +26,7 @@ export default async function OrdersPage(){
   const pending = orders.filter((order) => order.status === "PENDING").length;
   const paid = orders.filter((order) => order.status === "PAID").length;
 
-  const formatBulkDayLabel = (createdAt: Date) =>
+  const formatBulkDayLabel = (createdAt: string | Date) =>
     new Intl.DateTimeFormat(localeToIntl(locale), { weekday: "long" }).format(new Date(createdAt));
 
   const bulkCounts = orders.reduce((counts, order) => {

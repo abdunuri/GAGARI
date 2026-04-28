@@ -1,8 +1,9 @@
-import { auth } from "@/lib/auth";
+import { getCurrentSession } from "@/lib/auth-session";
+import { CACHE_TAGS, expireCache, readThroughCache } from "@/lib/data-cache";
 import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { OrderStatus, Prisma } from "@prisma/client";
-import { headers } from "next/headers";
+import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 
 
@@ -100,13 +101,13 @@ type OrderListItem = {
     id: string;
     bulkBatchId: string | null;
     status: OrderStatus;
-    createdAt: Date;
+    createdAt: string;
     customer: {
         id: number;
         name: string;
     };
     orderProducts: {
-        unitPrice: Prisma.Decimal;
+        unitPrice: number;
         quantity: number;
         product: {
             id: number;
@@ -118,7 +119,7 @@ type OrderListItem = {
 type CustomerLastDayBulkQuantity = {
     customerId: number;
     quantity: number;
-    orderedAt: Date;
+    orderedAt: string;
 };
 
 const orderSelect = {
@@ -152,6 +153,21 @@ function toCents(value: number) {
 
 function fromCents(value: number) {
     return Number((value / 100).toFixed(2));
+}
+
+function expireOrderCaches() {
+    expireCache([CACHE_TAGS.orders, CACHE_TAGS.dashboard, CACHE_TAGS.admin], ["/orders", "/orders/new", "/dashboard", "/Admin"]);
+}
+
+function normalizeOrderList(orders: Array<Prisma.OrderGetPayload<{ select: typeof orderSelect }>>): OrderListItem[] {
+    return orders.map((order) => ({
+        ...order,
+        createdAt: order.createdAt.toISOString(),
+        orderProducts: order.orderProducts.map((product) => ({
+            ...product,
+            unitPrice: Number(product.unitPrice),
+        })),
+    }));
 }
 
 function findUnboundedCoinCombination(denominations: number[], target: number) {
@@ -597,9 +613,7 @@ async function maybeSendBulkBatchNotification(
 }
 
 async function createOrder(orderinput: createOrderInput) {
-    const session = await auth.api.getSession({
-        headers:await headers()
-    })
+    const session = await getCurrentSession()
 
     if(!session){
         throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
@@ -681,6 +695,8 @@ async function createOrder(orderinput: createOrderInput) {
             customer:true
         }
     });
+    expireOrderCaches();
+
     if (order.bulkBatchId) {
         try {
             if (typeof orderinput.bulkExpectedCount === "number") {
@@ -724,9 +740,7 @@ async function createOrder(orderinput: createOrderInput) {
 };
 
 async function createOrdersBatch(batchInput: CreateOrdersBatchInput) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
+    const session = await getCurrentSession();
 
     if (!session) {
         throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
@@ -853,6 +867,8 @@ async function createOrdersBatch(batchInput: CreateOrdersBatchInput) {
         return results;
     });
 
+    expireOrderCaches();
+
     const notificationSeedOrder = createdOrders[createdOrders.length - 1];
     if (notificationSeedOrder) {
         try {
@@ -869,10 +885,40 @@ async function createOrdersBatch(batchInput: CreateOrdersBatchInput) {
     return createdOrders;
 }
 
+const queryOrdersByAccess = async (
+    bakeryId: number,
+    userId: string,
+    canManageAnyOrder: boolean,
+    page: number,
+    pageSize: number
+): Promise<OrderListItem[]> => {
+    const orders = await prisma.order.findMany({
+        where: {
+            bakeryId,
+            ...(canManageAnyOrder ? {} : { createdById: userId }),
+        },
+        select: orderSelect,
+        orderBy: {
+            createdAt: "desc",
+        },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+    });
+
+    return normalizeOrderList(orders);
+};
+
+const getCachedOrdersByAccess = unstable_cache(
+    queryOrdersByAccess,
+    ["orders-by-access"],
+    {
+        tags: [CACHE_TAGS.orders],
+        revalidate: 30,
+    }
+);
+
 async function getOrders(page = 1, pageSize = 20): Promise<OrderListItem[]> {
-    const session = await auth.api.getSession({
-        headers: await headers()
-    })
+    const session = await getCurrentSession()
 
     if (!session) {
         redirect(getLoginRedirectUrl());
@@ -880,57 +926,27 @@ async function getOrders(page = 1, pageSize = 20): Promise<OrderListItem[]> {
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     const userId = session.user.id;
-    const safePage = Math.max(1, page);
-    const safePageSize = Math.max(1, pageSize);
+    const pageNum = Number(page);
+    const pageSizeNum = Number(pageSize);
+    const safePage = Number.isFinite(pageNum) && pageNum >= 1 ? Math.floor(pageNum) : 1;
+    const safePageSize = Number.isFinite(pageSizeNum) && pageSizeNum >= 1 ? Math.floor(pageSizeNum) : 20;
     if (!bakeryId) {
         return [];
     }
 
-    if(session.user.role === "ADMIN"||session.user.role === "OWNER"){
-        const orders = await prisma.order.findMany({
-            where: {
-                bakeryId,
-            },
-            select: orderSelect,
-            orderBy: {
-                createdAt: "desc"
-            },
-            skip: (safePage - 1) * safePageSize,
-            take: safePageSize
-        })
-        return orders
-    }
-    const orders = await prisma.order.findMany({
-        where: {
-            bakeryId,
-            createdById: userId
-        },
-        select: orderSelect,
-        orderBy: {
-            createdAt: "desc"
-        },
-        skip: (safePage - 1) * safePageSize,
-        take: safePageSize
-    })
-    return orders
+    const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
+
+    return readThroughCache(
+        () => getCachedOrdersByAccess(bakeryId, userId, canManageAnyOrder, safePage, safePageSize),
+        () => queryOrdersByAccess(bakeryId, userId, canManageAnyOrder, safePage, safePageSize)
+    );
 };
 
-async function getCustomerLastDayBulkQuantities(): Promise<CustomerLastDayBulkQuantity[]> {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session) {
-        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
-    }
-    assertCanMutateOrders(session.user.role);
-
-    const bakeryId = parseBakeryId(session.user.bakeryId);
-    if (!bakeryId) {
-        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
-    }
-
-    const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
+const queryCustomerLastDayBulkQuantities = async (
+    bakeryId: number,
+    userId: string,
+    canManageAnyOrder: boolean
+): Promise<CustomerLastDayBulkQuantity[]> => {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
@@ -943,7 +959,7 @@ async function getCustomerLastDayBulkQuantities(): Promise<CustomerLastDayBulkQu
             ...(canManageAnyOrder
                 ? {}
                 : {
-                    createdById: session.user.id,
+                    createdById: userId,
                 }),
         },
         select: {
@@ -966,12 +982,12 @@ async function getCustomerLastDayBulkQuantities(): Promise<CustomerLastDayBulkQu
         take: 5000,
     });
 
-    const sameDayFallback = new Map<number, CustomerLastDayBulkQuantity>();
-    const previousDayCandidates = new Map<number, CustomerLastDayBulkQuantity>();
+    const sameDayFallback = new Map<number, { customerId: number; quantity: number; orderedAt: Date }>();
+    const previousDayCandidates = new Map<number, { customerId: number; quantity: number; orderedAt: Date }>();
 
     for (const order of orders) {
         const quantity = order.orderProducts.reduce((sum, item) => sum + item.quantity, 0);
-        const snapshot: CustomerLastDayBulkQuantity = {
+        const snapshot = {
             customerId: order.customerId,
             quantity,
             orderedAt: order.createdAt,
@@ -987,14 +1003,47 @@ async function getCustomerLastDayBulkQuantities(): Promise<CustomerLastDayBulkQu
     }
 
     return [...sameDayFallback.keys()].map((customerId) => {
-        return previousDayCandidates.get(customerId) ?? sameDayFallback.get(customerId)!;
+        const snapshot = previousDayCandidates.get(customerId) ?? sameDayFallback.get(customerId)!;
+
+        return {
+            ...snapshot,
+            orderedAt: snapshot.orderedAt.toISOString(),
+        };
     });
+};
+
+const getCachedCustomerLastDayBulkQuantities = unstable_cache(
+    queryCustomerLastDayBulkQuantities,
+    ["customer-last-day-bulk-quantities"],
+    {
+        tags: [CACHE_TAGS.orders],
+        revalidate: 30,
+    }
+);
+
+async function getCustomerLastDayBulkQuantities(): Promise<CustomerLastDayBulkQuantity[]> {
+    const session = await getCurrentSession();
+
+    if (!session) {
+        throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
+    }
+    assertCanMutateOrders(session.user.role);
+
+    const bakeryId = parseBakeryId(session.user.bakeryId);
+    if (!bakeryId) {
+        throw new OrderServiceError("NOT_ALLOWED", "Your account is not linked to a bakery.");
+    }
+
+    const canManageAnyOrder = session.user.role === "ADMIN" || session.user.role === "OWNER";
+
+    return readThroughCache(
+        () => getCachedCustomerLastDayBulkQuantities(bakeryId, session.user.id, canManageAnyOrder),
+        () => queryCustomerLastDayBulkQuantities(bakeryId, session.user.id, canManageAnyOrder)
+    );
 }
 
 async function updateOrder(orderId: string, updateInput: updateOrderInput) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
+    const session = await getCurrentSession();
 
     if (!session) {
         throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
@@ -1060,7 +1109,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
             throw new OrderServiceError("PRODUCT_NOT_IN_ORDER", "Product not found in this order.");
         }
 
-        return prisma.orderProduct.update({
+        const updatedOrderProduct = await prisma.orderProduct.update({
             where: {
                 productId_orderId: {
                     productId: updateInput.productId,
@@ -1071,6 +1120,9 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
                 quantity: updateInput.quantity,
             },
         });
+        expireOrderCaches();
+
+        return updatedOrderProduct;
     }
 
     if (!shouldUpdateStatus && !shouldUpdateAmount) {
@@ -1078,7 +1130,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
     }
 
     if (!shouldUpdateAmount) {
-        return prisma.order.update({
+        const order = await prisma.order.update({
             where: {
                 id: orderId,
             },
@@ -1086,6 +1138,9 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
                 status: updateInput.status,
             },
         });
+        expireOrderCaches();
+
+        return order;
     }
 
     const targetTotal = Number(updateInput.totalAmount);
@@ -1156,7 +1211,7 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
 
     const rebalancedProducts = rebalanceOrderProductPrices(updatedProducts, targetTotal);
 
-    return prisma.$transaction(async (tx) => {
+    const updatedOrder = await prisma.$transaction(async (tx) => {
         for (const product of rebalancedProducts) {
             await tx.orderProduct.update({
                 where: {
@@ -1185,12 +1240,14 @@ async function updateOrder(orderId: string, updateInput: updateOrderInput) {
             },
         });
     });
+
+    expireOrderCaches();
+
+    return updatedOrder;
 }
 
 async function deleteOrder(orderId: string) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
+    const session = await getCurrentSession();
 
     if (!session) {
         throw new OrderServiceError("UNAUTHORIZED", "You must be signed in.");
@@ -1221,7 +1278,7 @@ async function deleteOrder(orderId: string) {
         throw new OrderServiceError("NOT_ALLOWED", "You are not allowed to delete this order.");
     }
 
-    return prisma.$transaction(async (tx) => {
+    const deletedOrder = await prisma.$transaction(async (tx) => {
         await tx.orderProduct.deleteMany({
             where: {
                 orderId,
@@ -1234,6 +1291,10 @@ async function deleteOrder(orderId: string) {
             },
         });
     });
+
+    expireOrderCaches();
+
+    return deletedOrder;
 }
 
 export {createOrder, createOrdersBatch, getOrders, getCustomerLastDayBulkQuantities, updateOrder, deleteOrder,OrderServiceError};

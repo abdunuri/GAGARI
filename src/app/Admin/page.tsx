@@ -1,15 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, readThroughCache } from "@/lib/data-cache";
 import { cookies } from "next/headers";
+import { unstable_cache } from "next/cache";
 import { localeCookieName, localeToIntl, resolveLocale } from "@/lib/locales";
 import { getAdminDashboardCopy } from "@/lib/i18n/admin";
 import LanguageToggle from "@/components/language-toggle";
 
-export default async function AdminPage() {
-	const cookieStore = await cookies();
-	const locale = resolveLocale(cookieStore.get(localeCookieName)?.value, "en");
-	const copy = getAdminDashboardCopy(locale);
-	const localeDate = localeToIntl(locale);
-
+const queryAdminDashboardData = async () => {
 	const [
 		totalBakeries,
 		totalOrders,
@@ -18,7 +15,7 @@ export default async function AdminPage() {
 		totalOwners,
 		totalPendingOrders,
 		bakeryList,
-		ownerList,
+		ownerListRaw,
 	] = await Promise.all([
 		prisma.bakery.count(),
 		prisma.order.count(),
@@ -64,6 +61,50 @@ export default async function AdminPage() {
 			take: 12,
 		}),
 	]);
+
+	return {
+		totalBakeries,
+		totalOrders,
+		totalProducts,
+		totalCustomers,
+		totalOwners,
+		totalPendingOrders,
+		bakeryList,
+		ownerList: ownerListRaw.map((owner) => ({
+			...owner,
+			createdAt: owner.createdAt.toISOString(),
+		})),
+	};
+};
+
+const getCachedAdminDashboardData = unstable_cache(
+	queryAdminDashboardData,
+	["admin-dashboard-data"],
+	{
+		tags: [CACHE_TAGS.admin, CACHE_TAGS.bakeries, CACHE_TAGS.orders, CACHE_TAGS.products, CACHE_TAGS.customers],
+		revalidate: 60,
+	}
+);
+
+export default async function AdminPage() {
+	const cookieStore = await cookies();
+	const locale = resolveLocale(cookieStore.get(localeCookieName)?.value, "en");
+	const copy = getAdminDashboardCopy(locale);
+	const localeDate = localeToIntl(locale);
+
+	const {
+		totalBakeries,
+		totalOrders,
+		totalProducts,
+		totalCustomers,
+		totalOwners,
+		totalPendingOrders,
+		bakeryList,
+		ownerList,
+	} = await readThroughCache(
+		() => getCachedAdminDashboardData(),
+		() => queryAdminDashboardData()
+	);
 
 	const statValueMap = {
 		bakeries: totalBakeries,

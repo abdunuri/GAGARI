@@ -1,8 +1,11 @@
 import { auth } from "@/lib/auth"
+import { CACHE_TAGS, expireCache, readThroughCache } from "@/lib/data-cache"
 import { ForbiddenError, NotFoundError } from "@/lib/errors"
+import { getCurrentSession } from "@/lib/auth-session"
 import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
 import { headers } from "next/headers"
+import { unstable_cache } from "next/cache"
 import { redirect } from "next/navigation"
 
 
@@ -26,6 +29,31 @@ function assertCanMutateCustomers(role: string | null | undefined) {
         throw new ForbiddenError("Viewers are not allowed to modify customers.");
     }
 }
+
+const queryCustomersByAccess = async (bakeryId: number, userId: string, canManageAnyCustomer: boolean) => {
+    return prisma.customer.findMany({
+        where: {
+            bakeryId,
+            ...(canManageAnyCustomer ? {} : { createdById: userId }),
+            isActive: true,
+        },
+        include: {
+            bakery: true,
+        },
+        orderBy: {
+            name: "asc",
+        },
+    });
+};
+
+const getCachedCustomersByAccess = unstable_cache(
+    queryCustomersByAccess,
+    ["customers-by-access"],
+    {
+        tags: [CACHE_TAGS.customers],
+        revalidate: 60,
+    }
+);
 
 async function getAuthorizedCustomer(
     customerId: number,
@@ -81,9 +109,7 @@ async function getAuthorizedCustomer(
 }
 
 async function createCustomer(newCustomerInfo:newCustomerInfo){
-    const session = await auth.api.getSession({
-        headers:await headers()
-    })
+    const session = await getCurrentSession()
     if(!session){
         console.log("login required")
         redirect(`${process.env["BETTER_AUTH_URL"] ?? ""}/login`)    }
@@ -102,12 +128,12 @@ async function createCustomer(newCustomerInfo:newCustomerInfo){
 
         },
     });
+    expireCache([CACHE_TAGS.customers, CACHE_TAGS.dashboard, CACHE_TAGS.admin], ["/customers", "/orders/new", "/dashboard", "/Admin"]);
+
     return customer;
 }
 async function getCustomer() {
-    const session = await auth.api.getSession({
-        headers: await headers()
-    });
+    const session = await getCurrentSession();
     if (!session) {
         console.log("login required");
         redirect(getLoginRedirectUrl());
@@ -118,52 +144,41 @@ async function getCustomer() {
     if (!bakeryId) {
         throw new Error("Invalid bakeryId in session");
     }
-    if(session.user.role === "ADMIN"||session.user.role === "OWNER"){
-        const customers = await prisma.customer.findMany({
-            where: {
-                bakeryId,
-                isActive: true,
-            },
-            include:{
-                bakery:true
-            }
-        });
-        return customers;
-    }
+    const canManageAnyCustomer = session.user.role === "ADMIN" || session.user.role === "OWNER";
 
-    const customers = await prisma.customer.findMany({
-        where: {
-            bakeryId,
-            createdById: userId,
-            isActive: true,
-        },
-        include:{
-            bakery:true
-        }
-    });
-
-    return customers
+    return readThroughCache(
+        () => getCachedCustomersByAccess(bakeryId, userId, canManageAnyCustomer),
+        () => queryCustomersByAccess(bakeryId, userId, canManageAnyCustomer)
+    );
 }
 
 async function updateCustomer(customerId: number, updateInfo: updateCustomerInfo) {
     const { customer } = await getAuthorizedCustomer(customerId, await headers(), "update");
-    return prisma.customer.update({
+    const updatedCustomer = await prisma.customer.update({
         where: { id: customer.id },
         data: {
             name: updateInfo.name,
             phoneNumber: updateInfo.phoneNumber,
         },
     });
+
+    expireCache([CACHE_TAGS.customers, CACHE_TAGS.dashboard, CACHE_TAGS.admin], ["/customers", "/orders/new", "/dashboard", "/Admin"]);
+
+    return updatedCustomer;
 }
 
 async function deleteCustomer(customerId: number) {
     const { customer } = await getAuthorizedCustomer(customerId, await headers(), "delete");
-    return prisma.customer.update({
+    const deletedCustomer = await prisma.customer.update({
         where: { id: customer.id },
         data: {
             isActive: false,
         },
     });
+
+    expireCache([CACHE_TAGS.customers, CACHE_TAGS.dashboard, CACHE_TAGS.admin], ["/customers", "/orders/new", "/dashboard", "/Admin"]);
+
+    return deletedCustomer;
 }
 
 export {createCustomer,getCustomer,updateCustomer,deleteCustomer}

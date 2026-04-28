@@ -1,97 +1,77 @@
-import { auth } from "@/lib/auth"
+import Link from "next/link";
+import { getCurrentSession } from "@/lib/auth-session";
+import { CACHE_TAGS, readThroughCache } from "@/lib/data-cache";
 import { prisma } from "@/lib/prisma"
 import StaffBulkOrdersModal from "@/components/dashboard/StaffBulkOrdersModal";
-import { headers } from "next/headers"
 import { cookies } from "next/headers"
+import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation"
 import { getDashboardCopy, getRoleCopy } from "@/lib/i18n/dashboard";
 import { localeCookieName, localeToIntl, resolveLocale } from "@/lib/locales";
 
-export default async function Dashboard(){
-    const cookieStore = await cookies();
-    const locale = resolveLocale(cookieStore.get(localeCookieName)?.value);
-    const copy = getDashboardCopy(locale);
-    const roleCopy = getRoleCopy(locale);
-    const localeDate = localeToIntl(locale);
-
-    let session = null
-    try {
-        session = await auth.api.getSession({
-            headers:await headers()
-        })
-    } catch {
-        session = null
-    }
-
-    if(!session){
-        redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
-    }
-    const role = session.user.role as keyof typeof roleCopy;
-    if (role === "SYSTEM_ADMIN") {
-        redirect("/Admin");
-    }
-
-    const bakeryId = Number(session.user.bakeryId);
-    if (Number.isNaN(bakeryId)) {
-        redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
-    }
-
-    const dashboard = roleCopy[role] ?? roleCopy.STAFF;
-    const showStats = role === "ADMIN" || role === "OWNER";
-    const canCreateOrder = role !== "VIEWER";
-    const canManageAnyOrder = role === "ADMIN" || role === "OWNER";
-    let recentOrders =  await prisma.order.findMany({
-            where: { bakeryId },
-            include: { customer: true, orderProducts: true },
-            orderBy: { createdAt: "desc" },
-            take: 5,
-        })
-    const [customerCount, productCount, orderCount, pendingCount] = await Promise.all([
-        prisma.customer.count({ where: { bakeryId } }),
-        prisma.product.count({ where: { bakeryId } }),
-        prisma.order.count({ where: { bakeryId } }),
-        prisma.order.count({ where: { bakeryId, status: "PENDING" } }),
-    ]);
-
-    if(session.user.role !== "SYSTEM_ADMIN" && session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
-        recentOrders = recentOrders.filter(order => order.createdById === session.user.id);
-    }
-
-    const latestBulkBatch = await prisma.order.findFirst({
-        where: {
-            bakeryId,
-            bulkBatchId: {
-                not: null,
-            },
-            ...(canManageAnyOrder
-                ? {}
-                : {
-                    createdById: session.user.id,
-                }),
-        },
-        select: {
-            bulkBatchId: true,
-            createdAt: true,
-        },
-        orderBy: [
-            {
-                createdAt: "desc",
-            },
-            {
-                id: "desc",
-            },
-        ],
-    });
-
-    const latestBulkOrders = latestBulkBatch?.bulkBatchId
-        ? await prisma.order.findMany({
+const queryDashboardData = async (bakeryId: number, userId: string, canManageAnyOrder: boolean) => {
+    const [recentOrdersRaw, counts, latestBulkBatchRaw] = await Promise.all([
+        prisma.order.findMany({
             where: {
                 bakeryId,
-                bulkBatchId: latestBulkBatch.bulkBatchId,
+                ...(canManageAnyOrder ? {} : { createdById: userId }),
+            },
+            select: {
+                id: true,
+                createdAt: true,
+                createdById: true,
+                status: true,
+                customer: {
+                    select: {
+                        name: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+        }),
+        Promise.all([
+            prisma.customer.count({ where: { bakeryId } }),
+            prisma.product.count({ where: { bakeryId } }),
+            prisma.order.count({ where: { bakeryId } }),
+            prisma.order.count({ where: { bakeryId, status: "PENDING" } }),
+        ]),
+        prisma.order.findFirst({
+            where: {
+                bakeryId,
+                bulkBatchId: {
+                    not: null,
+                },
                 ...(canManageAnyOrder
                     ? {}
                     : {
-                        createdById: session.user.id,
+                        createdById: userId,
+                    }),
+            },
+            select: {
+                bulkBatchId: true,
+                createdAt: true,
+            },
+            orderBy: [
+                {
+                    createdAt: "desc",
+                },
+                {
+                    id: "desc",
+                },
+            ],
+        }),
+    ]);
+
+    const latestBulkOrdersRaw = latestBulkBatchRaw?.bulkBatchId
+        ? await prisma.order.findMany({
+            where: {
+                bakeryId,
+                bulkBatchId: latestBulkBatchRaw.bulkBatchId,
+                ...(canManageAnyOrder
+                    ? {}
+                    : {
+                        createdById: userId,
                     }),
             },
             select: {
@@ -125,6 +105,74 @@ export default async function Dashboard(){
             ],
         })
         : [];
+
+    const [customerCount, productCount, orderCount, pendingCount] = counts;
+
+    return {
+        customerCount,
+        productCount,
+        orderCount,
+        pendingCount,
+        recentOrders: recentOrdersRaw.map((order) => ({
+            ...order,
+            createdAt: order.createdAt.toISOString(),
+        })),
+        latestBulkBatch: latestBulkBatchRaw
+            ? {
+                ...latestBulkBatchRaw,
+                createdAt: latestBulkBatchRaw.createdAt.toISOString(),
+            }
+            : null,
+        latestBulkOrders: latestBulkOrdersRaw.map((order) => ({
+            ...order,
+            orderProducts: order.orderProducts.map((product) => ({
+                ...product,
+                unitPrice: Number(product.unitPrice),
+            })),
+        })),
+    };
+};
+
+const getCachedDashboardData = unstable_cache(
+    queryDashboardData,
+    ["dashboard-data"],
+    {
+        tags: [CACHE_TAGS.dashboard, CACHE_TAGS.orders, CACHE_TAGS.customers, CACHE_TAGS.products],
+        revalidate: 30,
+    }
+);
+
+export default async function Dashboard(){
+    const cookieStore = await cookies();
+    const locale = resolveLocale(cookieStore.get(localeCookieName)?.value);
+    const copy = getDashboardCopy(locale);
+    const roleCopy = getRoleCopy(locale);
+    const localeDate = localeToIntl(locale);
+
+    const session = await getCurrentSession();
+
+    if(!session){
+        redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
+    }
+    const role = session.user.role as keyof typeof roleCopy;
+    if (role === "SYSTEM_ADMIN") {
+        redirect("/Admin");
+    }
+
+    const bakeryId = Number(session.user.bakeryId);
+    if (Number.isNaN(bakeryId)) {
+        redirect(process.env["BETTER_AUTH_URL"] ? `${process.env["BETTER_AUTH_URL"]}/login` : "/login");
+    }
+
+    const dashboard = roleCopy[role] ?? roleCopy.STAFF;
+    const showStats = role === "ADMIN" || role === "OWNER";
+    const canCreateOrder = role !== "VIEWER";
+    const canManageAnyOrder = role === "ADMIN" || role === "OWNER";
+    const dashboardData = await readThroughCache(
+        () => getCachedDashboardData(bakeryId, session.user.id, canManageAnyOrder),
+        () => queryDashboardData(bakeryId, session.user.id, canManageAnyOrder)
+    );
+    const { recentOrders, customerCount, productCount, orderCount, pendingCount, latestBulkBatch, latestBulkOrders } = dashboardData;
 
     const latestBulkGroup = latestBulkBatch?.bulkBatchId
         ? (() => {
@@ -196,19 +244,19 @@ export default async function Dashboard(){
                                 </p>
                                 <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                                     {canCreateOrder && (
-                                        <a
+                                        <Link
                                             href="/orders/new"
                                             className="inline-flex w-full items-center justify-center rounded-full bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 sm:w-auto"
                                         >
                                             {dashboard.actions.find((action) => action.href === "/orders/new")?.label ?? copy.newOrderFallback}
-                                        </a>
+                                        </Link>
                                     )}
-                                    <a
+                                    <Link
                                         href="/orders"
                                         className="inline-flex w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 sm:w-auto"
                                     >
                                         {copy.viewOrders}
-                                    </a>
+                                    </Link>
                                     {role === "STAFF" && (
                                         <StaffBulkOrdersModal group={latestBulkGroup} locale={locale} />
                                     )}
@@ -254,14 +302,14 @@ export default async function Dashboard(){
                                 const descriptionText = isPrimary ? copy.primaryAction : copy.secondaryAction;
 
                                 return (
-                                    <a
+                                    <Link
                                         key={action.href}
                                         href={action.href}
                                         className={cardClass}
                                     >
                                         <p className={titleClass}>{action.label}</p>
                                         <p className={descriptionClass}>{descriptionText}</p>
-                                    </a>
+                                    </Link>
                                 );
                             })}
                         </div>
