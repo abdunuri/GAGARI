@@ -926,8 +926,10 @@ async function getOrders(page = 1, pageSize = 20): Promise<OrderListItem[]> {
 
     const bakeryId = parseBakeryId(session.user.bakeryId);
     const userId = session.user.id;
-    const safePage = Math.max(1, page);
-    const safePageSize = Math.max(1, pageSize);
+    const pageNum = Number(page);
+    const pageSizeNum = Number(pageSize);
+    const safePage = Number.isFinite(pageNum) && pageNum >= 1 ? Math.floor(pageNum) : 1;
+    const safePageSize = Number.isFinite(pageSizeNum) && pageSizeNum >= 1 ? Math.floor(pageSizeNum) : 20;
     if (!bakeryId) {
         return [];
     }

@@ -12,7 +12,10 @@ import { localeCookieName, localeToIntl, resolveLocale } from "@/lib/locales";
 const queryDashboardData = async (bakeryId: number, userId: string, canManageAnyOrder: boolean) => {
     const [recentOrdersRaw, counts, latestBulkBatchRaw] = await Promise.all([
         prisma.order.findMany({
-            where: { bakeryId },
+            where: {
+                bakeryId,
+                ...(canManageAnyOrder ? {} : { createdById: userId }),
+            },
             select: {
                 id: true,
                 createdAt: true,
@@ -169,12 +172,7 @@ export default async function Dashboard(){
         () => getCachedDashboardData(bakeryId, session.user.id, canManageAnyOrder),
         () => queryDashboardData(bakeryId, session.user.id, canManageAnyOrder)
     );
-    let recentOrders = dashboardData.recentOrders;
-    const { customerCount, productCount, orderCount, pendingCount, latestBulkBatch, latestBulkOrders } = dashboardData;
-
-    if(session.user.role !== "SYSTEM_ADMIN" && session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
-        recentOrders = recentOrders.filter(order => order.createdById === session.user.id);
-    }
+    const { recentOrders, customerCount, productCount, orderCount, pendingCount, latestBulkBatch, latestBulkOrders } = dashboardData;
 
     const latestBulkGroup = latestBulkBatch?.bulkBatchId
         ? (() => {

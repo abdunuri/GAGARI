@@ -89,7 +89,7 @@ export default function MobileDashboardMenu({ locale, role, signOutLabel, nav }:
           <div className="border-t border-zinc-200 pt-2">
             <div className="mb-2 flex items-center justify-between gap-2">
               <LanguageToggle locale={locale} />
-              <span className="text-right text-xs uppercase tracking-[0.16em] text-zinc-500">{role}</span>
+              <span className="text-right text-xs uppercase tracking-[0.16em] text-zinc-500">{role ?? ''}</span>
             </div>
             <SignOutButton label={signOutLabel} />
           </div>
