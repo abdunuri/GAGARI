@@ -1,9 +1,12 @@
 import { auth } from "@/lib/auth";
+import { CACHE_TAGS, expireCache, readThroughCache } from "@/lib/data-cache";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
+import { getCurrentSession } from "@/lib/auth-session";
 import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/client"
 import { headers } from "next/headers";
+import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 
 type newProduct  = {
@@ -23,6 +26,29 @@ function assertCanMutateProducts(role: string | null | undefined) {
         throw new ForbiddenError("Viewers are not allowed to modify products.");
     }
 }
+
+const queryProductsByBakery = async (bakeryId: number) => {
+    const products = await prisma.product.findMany({
+        where: { bakeryId },
+        orderBy: {
+            name: "asc",
+        },
+    });
+
+    return products.map((product) => ({
+        ...product,
+        price: Number(product.price),
+    }));
+};
+
+const getCachedProductsByBakery = unstable_cache(
+    queryProductsByBakery,
+    ["products-by-bakery"],
+    {
+        tags: [CACHE_TAGS.products],
+        revalidate: 60,
+    }
+);
 
 async function getAuthorizedProduct(productId: number) {
     const session = await auth.api.getSession({
@@ -63,9 +89,7 @@ async function getAuthorizedProduct(productId: number) {
 }
 
 async function CreateProduct(newProduct:newProduct){
-    const session = await auth.api.getSession({
-        headers:await headers()
-    })
+    const session = await getCurrentSession();
 
     if(!session){
         redirect(getLoginRedirectUrl())
@@ -89,14 +113,14 @@ async function CreateProduct(newProduct:newProduct){
         },
     });
 
+    expireCache([CACHE_TAGS.products, CACHE_TAGS.dashboard, CACHE_TAGS.admin], ["/products", "/orders/new", "/dashboard", "/Admin"]);
+
     return product;
 }
 
 
 async function GetProducts() {
-    const session = await auth.api.getSession({
-        headers: await headers()
-    });
+    const session = await getCurrentSession();
 
     if (!session) {
         redirect(getLoginRedirectUrl());
@@ -111,16 +135,16 @@ async function GetProducts() {
         throw new Error("User does not have a valid bakeryId");
     }
 
-    const products = await prisma.product.findMany({
-        where: { bakeryId }
-    });
-    return products
+    return readThroughCache(
+        () => getCachedProductsByBakery(bakeryId),
+        () => queryProductsByBakery(bakeryId)
+    );
 }
 
 async function UpdateProduct(productId: number, updateInput: updateProductInput) {
     await getAuthorizedProduct(productId);
 
-    return prisma.product.update({
+    const product = await prisma.product.update({
         where: {
             id: productId,
         },
@@ -130,6 +154,10 @@ async function UpdateProduct(productId: number, updateInput: updateProductInput)
             price: updateInput.price,
         },
     });
+
+    expireCache([CACHE_TAGS.products, CACHE_TAGS.orders, CACHE_TAGS.dashboard, CACHE_TAGS.admin], ["/products", "/orders", "/orders/new", "/dashboard", "/Admin"]);
+
+    return product;
 }
 
 async function DeleteProduct(productId: number) {
@@ -145,11 +173,15 @@ async function DeleteProduct(productId: number) {
         throw new ConflictError("This product is already used in orders and cannot be deleted.");
     }
 
-    return prisma.product.delete({
+    const product = await prisma.product.delete({
         where: {
             id: productId,
         },
     });
+
+    expireCache([CACHE_TAGS.products, CACHE_TAGS.dashboard, CACHE_TAGS.admin], ["/products", "/orders/new", "/dashboard", "/Admin"]);
+
+    return product;
 }
 
 export {CreateProduct,GetProducts,UpdateProduct,DeleteProduct}

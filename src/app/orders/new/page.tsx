@@ -191,6 +191,11 @@ export default function NewOrderPage() {
     [breadProducts, selectedProductId]
   );
 
+  const defaultBreadProductId = useMemo(
+    () => (breadProducts[0] ? String(breadProducts[0].id) : ""),
+    [breadProducts]
+  );
+
   const selectedBreadPrice = Number(selectedBreadProduct?.price ?? 0);
 
   const toSafeNumber = (value: string) => {
@@ -291,7 +296,7 @@ export default function NewOrderPage() {
         };
       })
       .filter((row) => row.quantity > 0);
-    const hasDraft = rowsToStore.length > 0 || Boolean(selectedProductId);
+    const hasDraft = rowsToStore.length > 0;
 
     if (!hasDraft) {
       clearBulkDraft();
@@ -660,7 +665,7 @@ export default function NewOrderPage() {
                     type="button"
                     onClick={() => {
                       setBulkQuantities({});
-                      setSelectedProductId("");
+                      setSelectedProductId(defaultBreadProductId);
                       clearBulkDraft();
                       setDraftInfo(null);
                     }}
