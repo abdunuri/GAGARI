@@ -38,13 +38,40 @@ export default async function ProtectedShell({
               <p className="max-w-sm text-xs text-zinc-500 sm:text-sm lg:max-w-none lg:text-xs">{chrome.subtitle}</p>
             </div>
 
-            <div className="flex items-center gap-2 lg:hidden">
-              <LanguageToggle locale={locale} />
-              <SignOutButton label={chrome.signOut} />
-            </div>
+            <details className="group relative lg:hidden">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-100 [&::-webkit-details-marker]:hidden">
+                <span className="text-base leading-none group-open:hidden">☰</span>
+                <span className="text-base leading-none hidden group-open:inline">✕</span>
+                <span>Menu</span>
+              </summary>
+              <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 flex w-64 flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xl">
+                <Link href="/dashboard" className="rounded-xl px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-900">
+                  {chrome.nav.dashboard}
+                </Link>
+                <Link href="/customers" className="rounded-xl px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-900">
+                  {chrome.nav.customers}
+                </Link>
+                <Link href="/products" className="rounded-xl px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-900">
+                  {chrome.nav.products}
+                </Link>
+                <Link href="/orders" className="rounded-xl px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-900">
+                  {chrome.nav.orders}
+                </Link>
+                <Link href="/orders/new" className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700">
+                  {chrome.nav.newOrder}
+                </Link>
+                <div className="border-t border-zinc-200 pt-2">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <LanguageToggle locale={locale} />
+                    <span className="text-right text-xs uppercase tracking-[0.16em] text-zinc-500">{session.user.role}</span>
+                  </div>
+                  <SignOutButton label={chrome.signOut} />
+                </div>
+              </div>
+            </details>
           </div>
 
-          <nav className="flex items-center gap-2 overflow-x-auto pb-1 text-sm text-zinc-600 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:justify-center lg:overflow-visible lg:pb-0">
+          <nav className="hidden items-center gap-2 overflow-x-auto pb-1 text-sm text-zinc-600 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex lg:justify-center lg:overflow-visible lg:pb-0">
             <Link
               href="/dashboard"
               className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 font-medium transition hover:border-zinc-300 hover:bg-zinc-900 hover:text-white lg:px-4 lg:py-1.5"
