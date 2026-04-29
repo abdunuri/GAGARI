@@ -123,6 +123,9 @@ type CustomerLastDayBulkQuantity = {
     orderedAt: string;
 };
 
+const BULK_ORDER_TRANSACTION_MAX_WAIT_MS = 10_000;
+const BULK_ORDER_TRANSACTION_TIMEOUT_MS = 60_000;
+
 const orderSelect = {
     id: true,
     bulkBatchId: true,
@@ -788,35 +791,41 @@ async function createOrdersBatch(batchInput: CreateOrdersBatchInput) {
         throw new OrderServiceError("NOT_ALLOWED", "One or more products do not belong to this bakery.");
     }
 
-    const createdOrders = await prisma.$transaction(async (tx) => {
-        const results: OrderNotificationPayload[] = [];
+    const createdOrders = await prisma.$transaction(
+        async (tx) => {
+            const results: OrderNotificationPayload[] = [];
 
-        for (const orderInput of batchInput.orders) {
-            const createdOrder = await tx.order.create({
-                data: {
-                    createdById: session.user.id,
-                    bakeryId,
-                    customerId: orderInput.customerId,
-                    bulkBatchId: batchInput.bulkBatchId,
-                    orderProducts: {
-                        create: orderInput.orderProducts.map((product) => ({
-                            productId: product.productId,
-                            unitPrice: product.unitPrice,
-                            quantity: product.quantity,
-                        })),
+            for (const orderInput of batchInput.orders) {
+                const createdOrder = await tx.order.create({
+                    data: {
+                        createdById: session.user.id,
+                        bakeryId,
+                        customerId: orderInput.customerId,
+                        bulkBatchId: batchInput.bulkBatchId,
+                        orderProducts: {
+                            create: orderInput.orderProducts.map((product) => ({
+                                productId: product.productId,
+                                unitPrice: product.unitPrice,
+                                quantity: product.quantity,
+                            })),
+                        },
                     },
-                },
-                include: {
-                    orderProducts: true,
-                    customer: true,
-                },
-            });
+                    include: {
+                        orderProducts: true,
+                        customer: true,
+                    },
+                });
 
-            results.push(createdOrder);
+                results.push(createdOrder);
+            }
+
+            return results;
+        },
+        {
+            maxWait: BULK_ORDER_TRANSACTION_MAX_WAIT_MS,
+            timeout: BULK_ORDER_TRANSACTION_TIMEOUT_MS,
         }
-
-        return results;
-    });
+    );
 
     expireOrderCaches();
 
