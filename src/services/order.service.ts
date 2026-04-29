@@ -852,11 +852,13 @@ const queryOrdersByAccess = async (
     page: number,
     pageSize: number
 ): Promise<OrderListItem[]> => {
+    const baseWhere: Prisma.OrderWhereInput = {
+        bakeryId,
+        ...(canManageAnyOrder ? {} : { createdById: userId }),
+    };
+
     const orders = await prisma.order.findMany({
-        where: {
-            bakeryId,
-            ...(canManageAnyOrder ? {} : { createdById: userId }),
-        },
+        where: baseWhere,
         select: orderSelect,
         orderBy: {
             createdAt: "desc",
@@ -865,7 +867,37 @@ const queryOrdersByAccess = async (
         take: pageSize,
     });
 
-    return normalizeOrderList(orders);
+    const bulkBatchIds = Array.from(
+        new Set(orders.map((order) => order.bulkBatchId).filter((bulkBatchId): bulkBatchId is string => Boolean(bulkBatchId)))
+    );
+
+    if (bulkBatchIds.length === 0) {
+        return normalizeOrderList(orders);
+    }
+
+    const completeBulkOrders = await prisma.order.findMany({
+        where: {
+            ...baseWhere,
+            bulkBatchId: {
+                in: bulkBatchIds,
+            },
+        },
+        select: orderSelect,
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+
+    const ordersById = new Map(orders.map((order) => [order.id, order]));
+    for (const order of completeBulkOrders) {
+        ordersById.set(order.id, order);
+    }
+
+    const completeOrders = Array.from(ordersById.values()).sort(
+        (left, right) => right.createdAt.getTime() - left.createdAt.getTime()
+    );
+
+    return normalizeOrderList(completeOrders);
 };
 
 const getCachedOrdersByAccess = unstable_cache(

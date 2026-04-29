@@ -2,6 +2,11 @@
 
 All notable changes to GaGari are documented here.
 
+## [1.1.3] - 2026-04-29
+
+### Fixed
+- Fixed bulk batches on the orders page so grouped totals include every order in the batch, not only the first paginated slice.
+
 ## [1.1.1] - 2026-04-29
 
 ### Added
