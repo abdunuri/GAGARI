@@ -28,7 +28,7 @@ export function LoginForm({
   const [password, setPassword] = useState("")
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
-  const [loginMode, setLoginMode] = useState<"username" | "email">("email")
+  const [loginMode, setLoginMode] = useState<"username" | "email">("username")
   const [isLoading, setIsLoading] = useState(false)
   const [signInError, setSignInError] = useState("")
   const [signInSuccess, setSignInSuccess] = useState("")
