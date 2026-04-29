@@ -84,6 +84,7 @@ type BulkOrderDraft = {
 import { useRouter } from "next/navigation";
 
 const BULK_DRAFT_STORAGE_KEY = "bulk-order-draft";
+const BULK_DEFAULT_PRODUCT_STORAGE_KEY = "bulk-order-default-product";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function createBulkBatchId() {
@@ -117,19 +118,27 @@ export default function NewOrderPage() {
   const [message, setMessage] = useState("");
   const [successPopup, setSuccessPopup] = useState<string | null>(null);
   const [draftInfo, setDraftInfo] = useState<{ savedAt: number; restored: boolean } | null>(null);
+  const [isBulkProductSelectorVisible, setIsBulkProductSelectorVisible] = useState(false);
   const bulkQuantityRefs = useRef<Array<HTMLInputElement | null>>([]);
   const hasHydratedDraft = useRef(false);
+  const hasHydratedBulkDefault = useRef(false);
 
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
         const res = await fetch("/api/customer", { method: "GET" });
-        const data: GetCustomerResponse = await res.json();
-        setCustomers(data.customers);
+        const data: Partial<GetCustomerResponse> = await res.json();
+        const fetchedCustomers = Array.isArray(data.customers) ? data.customers : null;
+
+        if (!res.ok || !fetchedCustomers) {
+          throw new Error(data.message || loadCustomersFailedMessage);
+        }
+
+        setCustomers(fetchedCustomers);
 
         setBulkQuantities((current) => {
           const next = { ...current };
-          for (const customer of data.customers) {
+          for (const customer of fetchedCustomers) {
             if (next[customer.id] === undefined) {
               next[customer.id] = "";
             }
@@ -144,13 +153,14 @@ export default function NewOrderPage() {
     const fetchProducts = async () => {
       try {
         const res = await fetch("/api/product", { method: "GET" });
-        const data: GetProductResponse = await res.json();
-        setProducts(data.products);
+        const data: Partial<GetProductResponse> = await res.json();
+        const fetchedProducts = Array.isArray(data.products) ? data.products : null;
 
-        const breadProducts = data.products.filter((product) => product.category === "BREAD");
-        if (breadProducts.length > 0) {
-          setSelectedProductId((current) => current || String(breadProducts[0].id));
+        if (!res.ok || !fetchedProducts) {
+          throw new Error(data.message || loadProductsFailedMessage);
         }
+
+        setProducts(fetchedProducts);
       } catch {
         setMessage(loadProductsFailedMessage);
       }
@@ -191,12 +201,36 @@ export default function NewOrderPage() {
     [breadProducts, selectedProductId]
   );
 
-  const defaultBreadProductId = useMemo(
-    () => (breadProducts[0] ? String(breadProducts[0].id) : ""),
-    [breadProducts]
-  );
-
   const selectedBreadPrice = Number(selectedBreadProduct?.price ?? 0);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || hasHydratedBulkDefault.current || breadProducts.length === 0) {
+      return;
+    }
+
+    hasHydratedBulkDefault.current = true;
+    const savedProductId = window.localStorage.getItem(BULK_DEFAULT_PRODUCT_STORAGE_KEY);
+    const hasSelectedProduct = breadProducts.some((product) => product.id === Number(selectedProductId));
+    const hasSavedProduct = breadProducts.some((product) => product.id === Number(savedProductId));
+
+    if (hasSelectedProduct) {
+      setIsBulkProductSelectorVisible(false);
+      return;
+    }
+
+    if (savedProductId && hasSavedProduct) {
+      setSelectedProductId(savedProductId);
+      setIsBulkProductSelectorVisible(false);
+      return;
+    }
+
+    if (savedProductId) {
+      window.localStorage.removeItem(BULK_DEFAULT_PRODUCT_STORAGE_KEY);
+    }
+
+    setSelectedProductId("");
+    setIsBulkProductSelectorVisible(true);
+  }, [breadProducts, selectedProductId]);
 
   const toSafeNumber = (value: string) => {
     const parsed = Number(value);
@@ -226,6 +260,20 @@ export default function NewOrderPage() {
     }
 
     window.localStorage.removeItem(BULK_DRAFT_STORAGE_KEY);
+  };
+
+  const setBulkBreadDefault = (productId: string) => {
+    setSelectedProductId(productId);
+
+    if (typeof window !== "undefined") {
+      if (productId) {
+        window.localStorage.setItem(BULK_DEFAULT_PRODUCT_STORAGE_KEY, productId);
+      } else {
+        window.localStorage.removeItem(BULK_DEFAULT_PRODUCT_STORAGE_KEY);
+      }
+    }
+
+    setIsBulkProductSelectorVisible(!productId);
   };
 
   const showSuccessPopup = (text: string) => {
@@ -665,7 +713,6 @@ export default function NewOrderPage() {
                     type="button"
                     onClick={() => {
                       setBulkQuantities({});
-                      setSelectedProductId(defaultBreadProductId);
                       clearBulkDraft();
                       setDraftInfo(null);
                     }}
@@ -676,25 +723,27 @@ export default function NewOrderPage() {
                 </div>
               )}
 
-              <div hidden>
-                <label className="mb-1 block text-sm font-medium text-zinc-800">{copy.bulk.breadProduct}</label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
-                  className="w-full rounded-2xl border border-zinc-200 px-4 py-3"
-                  required
-                >
-                  <option value="">{copy.bulk.selectBread}</option>
-                  {breadProducts.map((bread) => (
-                    <option key={bread.id} value={bread.id}>
-                      {bread.name} ({bread.price})
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-2 text-xs text-zinc-500">
-                  {copy.bulk.breadHint}
-                </p>
-              </div>
+              {(isBulkProductSelectorVisible || !selectedBreadProduct) && (
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
+                  <label className="mb-1 block text-sm font-medium text-zinc-800">{copy.bulk.breadProduct}</label>
+                  <select
+                    value={selectedProductId}
+                    onChange={(e) => setBulkBreadDefault(e.target.value)}
+                    className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3"
+                    required
+                  >
+                    <option value="">{copy.bulk.selectBread}</option>
+                    {breadProducts.map((bread) => (
+                      <option key={bread.id} value={bread.id}>
+                        {bread.name} ({bread.price})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    {copy.bulk.breadHint}
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -774,7 +823,18 @@ export default function NewOrderPage() {
                 <p className="mt-1 text-sm text-zinc-600">{copy.bulk.activeCustomersHint}</p>
               </div>
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{copy.bulk.selectedBread}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{copy.bulk.selectedBread}</p>
+                  {breadProducts.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsBulkProductSelectorVisible(true)}
+                      className="rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50"
+                    >
+                      {copy.bulk.changeBread}
+                    </button>
+                  )}
+                </div>
                 <p className="mt-2 text-lg font-semibold text-zinc-900">
                   {selectedBreadProduct ? selectedBreadProduct.name : copy.bulk.noBreadSelected}
                 </p>

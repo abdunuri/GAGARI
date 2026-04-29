@@ -24,6 +24,10 @@ export default async function ProtectedShell({
     redirect("/login");
   }
 
+  if (session.user.role === "SYSTEM_ADMIN") {
+    redirect("/Admin");
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 text-zinc-900">
       <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/90 backdrop-blur">

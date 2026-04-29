@@ -3,11 +3,13 @@ import { getCurrentSession } from "@/lib/auth-session";
 import { CACHE_TAGS, readThroughCache } from "@/lib/data-cache";
 import { prisma } from "@/lib/prisma"
 import StaffBulkOrdersModal from "@/components/dashboard/StaffBulkOrdersModal";
+import TelegramSettingsForm from "@/components/dashboard/TelegramSettingsForm";
 import { cookies } from "next/headers"
 import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation"
 import { getDashboardCopy, getRoleCopy } from "@/lib/i18n/dashboard";
 import { localeCookieName, localeToIntl, resolveLocale } from "@/lib/locales";
+import { getTelegramSettingsForOwner } from "@/services/telegram-settings.service";
 
 const queryDashboardData = async (bakeryId: number, userId: string, canManageAnyOrder: boolean) => {
     const [recentOrdersRaw, counts, latestBulkBatchRaw] = await Promise.all([
@@ -169,6 +171,7 @@ export default async function Dashboard(){
         () => getCachedDashboardData(bakeryId, session.user.id, canManageAnyOrder),
         () => queryDashboardData(bakeryId, session.user.id, canManageAnyOrder)
     );
+    const telegramSettings = role === "OWNER" ? await getTelegramSettingsForOwner() : null;
     let recentOrders = dashboardData.recentOrders;
     const { customerCount, productCount, orderCount, pendingCount, latestBulkBatch, latestBulkOrders } = dashboardData;
 
@@ -351,6 +354,13 @@ export default async function Dashboard(){
                             ))}                        </div>
                     </div>
                 </div>
+
+                {role === "OWNER" && (
+                    <TelegramSettingsForm
+                        initialBotToken={telegramSettings?.botToken ?? ""}
+                        initialChatIds={telegramSettings?.chatIds ?? []}
+                    />
+                )}
             </section>
         </main>
     )

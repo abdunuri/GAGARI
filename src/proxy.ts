@@ -52,6 +52,24 @@ export async function proxy(request: NextRequest) {
         loginUrl.searchParams.set("next", pathname + request.nextUrl.search);
         return NextResponse.redirect(loginUrl);    }
 
+    const isSystemAdminArea = pathname.startsWith("/Admin") || pathname.startsWith("/api/admin");
+
+    if (session.user.role === "SYSTEM_ADMIN" && !isSystemAdminArea) {
+        if (pathname.startsWith("/api/")) {
+            return NextResponse.json({ message: "System admins can only use the system admin area." }, { status: 403 });
+        }
+
+        return NextResponse.redirect(new URL("/Admin", request.url));
+    }
+
+    if (session.user.role !== "SYSTEM_ADMIN" && isSystemAdminArea) {
+        if (pathname.startsWith("/api/")) {
+            return NextResponse.json({ message: "System admin access required." }, { status: 403 });
+        }
+
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
     return NextResponse.next();
 }
 

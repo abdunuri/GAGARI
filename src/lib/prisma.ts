@@ -43,6 +43,19 @@ const globalForPrisma = globalThis as typeof globalThis & {
 	prisma?: PrismaClient;
 };
 
+function hasCurrentGeneratedDelegates(client: PrismaClient | undefined) {
+	if (!client) {
+		return false;
+	}
+
+	return "telegramSettings" in client;
+}
+
+if (globalForPrisma.prisma && !hasCurrentGeneratedDelegates(globalForPrisma.prisma)) {
+	void globalForPrisma.prisma.$disconnect().catch(() => undefined);
+	globalForPrisma.prisma = undefined;
+}
+
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
