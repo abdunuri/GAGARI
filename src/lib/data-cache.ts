@@ -7,6 +7,7 @@ export const CACHE_TAGS = {
   dashboard: "dashboard",
   orders: "orders",
   products: "products",
+  telegramSettings: "telegram-settings",
 } as const;
 
 type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];

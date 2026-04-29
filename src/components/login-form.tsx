@@ -28,10 +28,16 @@ export function LoginForm({
   const [password, setPassword] = useState("")
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
-  const [loginMode, setLoginMode] = useState<"username" | "email">("username")
+  const [loginMode, setLoginMode] = useState<"username" | "email">("email")
   const [isLoading, setIsLoading] = useState(false)
   const [signInError, setSignInError] = useState("")
   const [signInSuccess, setSignInSuccess] = useState("")
+
+  const switchLoginMode = () => {
+    setLoginMode((current) => (current === "email" ? "username" : "email"))
+    setSignInError("")
+    setSignInSuccess("")
+  }
 
   useEffect(() => {
     if (!signInSuccess) {
@@ -52,32 +58,6 @@ export function LoginForm({
           <CardTitle className="text-xl">Bakery staff login</CardTitle>
         </CardHeader>
         <CardContent className="px-5 sm:px-6">
-          <div className="mb-4 rounded-lg border p-1">
-            <div className="grid grid-cols-2 gap-1">
-              <Button
-                type="button"
-                variant={loginMode === "username" ? "default" : "ghost"}
-                onClick={() => {
-                  setLoginMode("username")
-                  setSignInError("")
-                  setSignInSuccess("")
-                }}
-              >
-                Username login
-              </Button>
-              <Button
-                type="button"
-                variant={loginMode === "email" ? "default" : "ghost"}
-                onClick={() => {
-                  setLoginMode("email")
-                  setSignInError("")
-                  setSignInSuccess("")
-                }}
-              >
-                Email login
-              </Button>
-            </div>
-          </div>
           <form
             onSubmit={async (e) => {
               e.preventDefault()
@@ -148,6 +128,13 @@ export function LoginForm({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+                <button
+                  type="button"
+                  onClick={switchLoginMode}
+                  className="w-fit text-sm underline-offset-4 hover:underline"
+                >
+                  {loginMode === "email" ? "Use username instead" : "Use email instead"}
+                </button>
               </Field>
               <Field>
                 <Button type="submit" className="w-full" disabled={isLoading}>

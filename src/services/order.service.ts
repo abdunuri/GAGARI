@@ -3,6 +3,7 @@ import { CACHE_TAGS, expireCache, readThroughCache } from "@/lib/data-cache";
 import { getLoginRedirectUrl, parseBakeryId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { OrderStatus, Prisma } from "@prisma/client";
+import { getTelegramSettingsForBakery, type TelegramNotificationSettings } from "@/services/telegram-settings.service";
 import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -323,28 +324,6 @@ function rebalanceOrderProductPrices(
     return adjustedProducts;
 }
 
-function parseTelegramChatIds() {
-    const rawValue = process.env["tg_chat_ids"] ?? process.env["TG_CHAT_IDS"];
-
-    if (!rawValue) {
-        return [] as string[];
-    }
-
-    try {
-        const parsed = JSON.parse(rawValue);
-        if (Array.isArray(parsed)) {
-            return parsed.map((value) => String(value).trim()).filter(Boolean);
-        }
-    } catch {
-        // Fall through to comma-separated parsing.
-    }
-
-    return rawValue
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean);
-}
-
 function escapeTelegramHtml(value: string) {
     return value
         .replace(/&/g, "&amp;")
@@ -451,24 +430,15 @@ function buildBulkBatchTelegramMessage(tableData: BulkBatchTableData, bulkBatchI
     return lines.join("\n");
 }
 
-async function sendTelegramBulkNotification(order: OrderNotificationPayload) {
-    const telegramBotToken = process.env["TELEGRAM_BOT_TOKEN"];
-    const chatIds = parseTelegramChatIds();
-
-    if (!telegramBotToken || chatIds.length === 0) {
-        return;
-    }
-
-    const message = buildOrderTelegramMessage(order);
-
+async function sendTelegramMessage(settings: TelegramNotificationSettings, message: string) {
     const payload = {
         parse_mode: "HTML",
         text: message,
     };
 
     await Promise.allSettled(
-        chatIds.map((chatId) =>
-            fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+        settings.chatIds.map((chatId) =>
+            fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -480,6 +450,17 @@ async function sendTelegramBulkNotification(order: OrderNotificationPayload) {
             })
         )
     );
+}
+
+async function sendTelegramBulkNotification(order: OrderNotificationPayload) {
+    const telegramSettings = await getTelegramSettingsForBakery(order.bakeryId);
+
+    if (!telegramSettings) {
+        return;
+    }
+
+    const message = buildOrderTelegramMessage(order);
+    await sendTelegramMessage(telegramSettings, message);
 }
 
 async function maybeSendBulkBatchNotification(
@@ -499,10 +480,9 @@ async function maybeSendBulkBatchNotification(
         return;
     }
 
-    const telegramBotToken = process.env["TELEGRAM_BOT_TOKEN"];
-    const chatIds = parseTelegramChatIds();
+    const telegramSettings = await getTelegramSettingsForBakery(createdOrder.bakeryId);
 
-    if (!telegramBotToken || chatIds.length === 0 || !createdOrder.bulkBatchId) {
+    if (!telegramSettings || !createdOrder.bulkBatchId) {
         return;
     }
 
@@ -594,21 +574,7 @@ async function maybeSendBulkBatchNotification(
         const tableData = buildBulkBatchTableData(batchOrders);
         const textFallbackMessage = buildBulkBatchTelegramMessage(tableData, bulkBatchId, batchOrders.length);
 
-        await Promise.allSettled(
-            chatIds.map((chatId) =>
-                fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        parse_mode: "HTML",
-                        text: textFallbackMessage,
-                    }),
-                })
-            )
-        );
+        await sendTelegramMessage(telegramSettings, textFallbackMessage);
     });
 }
 
@@ -708,27 +674,12 @@ async function createOrder(orderinput: createOrderInput) {
             console.error("Failed to send bulk order notification", error);
         }
     } else {
-        const telegramBotToken = process.env["TELEGRAM_BOT_TOKEN"];
-        const chatIds = parseTelegramChatIds();
-        if (telegramBotToken && chatIds.length > 0) {
+        const telegramSettings = await getTelegramSettingsForBakery(order.bakeryId);
+        if (telegramSettings) {
             const message = buildOrderTelegramMessage(order);
 
             try {
-                await Promise.allSettled(
-                    chatIds.map((chatId) =>
-                        fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json"
-                            },
-                            body: JSON.stringify({
-                                chat_id: chatId,
-                                parse_mode: "HTML",
-                                text: message
-                            })
-                        })
-                    )
-                );
+                await sendTelegramMessage(telegramSettings, message);
             } catch (error) {
                 console.error("Failed to send order notification", error);
             }
