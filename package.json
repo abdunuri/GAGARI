@@ -1,14 +1,12 @@
 {
   "name": "gagari",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:status:supabase": "node scripts/prisma-supabase-guard.mjs status",
-    "db:migrate:supabase": "node scripts/prisma-supabase-guard.mjs deploy",
     "postinstall": "prisma generate",
     "test": "vitest run"
   },
